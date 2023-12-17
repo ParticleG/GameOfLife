@@ -20,13 +20,18 @@ elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
     add_compile_options(/MP /utf-8)
     add_compile_definitions(
             _CRT_SECURE_NO_WARNINGS
-            NOMINMAX
-            NOGDI
-            WIN32_LEAN_AND_MEAN
     )
 endif ()
 
 add_executable(${PROJECT_NAME} main.cc)
+
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/FetchFTXUI.cmake)
+
+target_link_libraries(${PROJECT_NAME}
+        PRIVATE ftxui::screen
+        PRIVATE ftxui::dom
+        PRIVATE ftxui::component # Not needed for this example.
+)
 
 target_include_directories(${PROJECT_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
