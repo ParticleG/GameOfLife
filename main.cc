@@ -1,57 +1,41 @@
-#include <iostream>
-
+#include <ftxui/component/component.hpp>
+#include <ftxui/component/screen_interactive.hpp>
 #include <ftxui/dom/elements.hpp>
-#include <ftxui/screen/screen.hpp>
 
 #include <types/GameOfLife.h>
-
-#include "ftxui/component/component.hpp"
-#include "ftxui/component/screen_interactive.hpp"
 
 using namespace ftxui;
 using namespace std;
 using namespace types;
 
 int main() {
-    using namespace ftxui;
-    auto make_box = [](int dimx, int dimy) {
-        std::string title = std::to_string(dimx) + "x" + std::to_string(dimy);
-        return window(text(title) | hcenter | bold,
-                      text("content") | hcenter | dim) |
-               size(WIDTH, EQUAL, dimx) | size(HEIGHT, EQUAL, dimy);
-    };
+    int mouse_x{}, mouse_y{};
+    const auto renderer_plot_1 = Renderer([&] {
+        auto c = Canvas(100, 100);
 
-    auto style = size(WIDTH, GREATER_THAN, 20) | border |
-                 size(HEIGHT, GREATER_THAN, 30);
+        std::vector<int> ys(100);
+        for (int x = 0; x < 100; x++) {
+            const auto dx = static_cast<float>(x - mouse_x);
+            constexpr float dy = 50.f;
+            ys[x] = static_cast<int>(dy + 20 * cos(dx * 0.14) + 10 * sin(dx * 0.42));
+        }
+        for (int x = 1; x < 99; x++)
+            c.DrawPointLine(x, ys[x], x + 1, ys[x + 1]);
 
-    auto document = hflow({
-                        make_box(7, 7),
-                        make_box(7, 5),
-                        make_box(5, 7),
-                        make_box(10, 4),
-                        make_box(10, 4),
-                        make_box(10, 4),
-                        make_box(10, 4),
-                        make_box(11, 4),
-                        make_box(11, 4),
-                        make_box(11, 4),
-                        make_box(11, 4),
-                        make_box(12, 4),
-                        make_box(12, 5),
-                        make_box(12, 4),
-                        make_box(13, 4),
-                        make_box(13, 3),
-                        make_box(13, 3),
-                        make_box(10, 3),
-                    }) |
-                    style;
+        return hflow({canvas(std::move(c))}) | border;
+    });
+
+    const auto container = Container::Horizontal({renderer_plot_1});
+    auto tab_with_mouse = CatchEvent(container, [&](Event e) {
+        if (e.is_mouse()) {
+            mouse_x = (e.mouse().x - 1) * 2;
+            mouse_y = (e.mouse().y - 1) * 4;
+        }
+        return false;
+    });
 
     auto screen = ScreenInteractive::Fullscreen();
-    // auto screen = Screen::Create(Dimension::Full(), Dimension::Full());
-    // Render(screen, document);
-    screen.Loop(Renderer([&]() {
-        return document;
-    }));
+    screen.Loop(container);
     getchar();
 
     return 0;
