@@ -1,50 +1,117 @@
 #include <algorithm>
-#include <iostream>
 #include <random>
+
+#include <ftxui/component/component.hpp>
+#include <ftxui/component/screen_interactive.hpp>
 
 #include <types/GameOfLife.h>
 
 using namespace std;
 using namespace types;
 
-GameOfLife::GameOfLife(const uint64_t height, const uint64_t width) {
-    random_device rd;
-    mt19937 gen(rd());
-    uniform_int_distribution<> distrib(0, 1);
+namespace {
+    constexpr auto cell = "██";
 
-    for (uint64_t i = 0; i < height; ++i) {
-        // Insert random values into the field
-        _field.emplace_back(width);
-        ranges::generate(
-            _field[i],
-            [&distrib, &gen] {
-                return distrib(gen);
-            }
-        );
+    void drawCell(ftxui::Canvas& c, const Point& mouse, const ftxui::Color color) {
+        c.DrawText(4 * mouse.x, 4 * mouse.y, cell, color);
     }
 }
 
-void GameOfLife::run() {
-    _printField();
-    _updateField();
-}
-
-void GameOfLife::_resetField() {
+GameOfLife::GameOfLife(const uint64_t height, const uint64_t width) : _fieldSize(width, height) {
+    _field.resize(height);
     ranges::for_each(
         _field,
-        [](auto& sub) {
-            fill(sub.begin(), sub.end(), false);
+        [&](auto& sub) {
+            sub.resize(width);
         }
     );
 }
 
-void GameOfLife::_printField() const {
-    for (const auto& sub: _field) {
-        for (const auto& cell: sub) {
-            cout << (cell ? "+" : ".");
+void GameOfLife::randomize() {
+    mt19937 gen(random_device{}());
+    uniform_int_distribution distrib(0, 1);
+    ranges::for_each(
+        _field,
+        [&](auto& sub) {
+            ranges::generate(sub.begin(), sub.end(), [&] {
+                return distrib(gen);
+            });
         }
-        cout << endl;
-    }
+    );
+}
+
+void GameOfLife::reset() {
+    ranges::for_each(
+        _field,
+        [&](auto& sub) {
+            ranges::fill(sub, false);
+        }
+    );
+}
+
+void GameOfLife::run() {
+    const auto cellRenderArea = ftxui::Renderer([this] {
+        auto c = ftxui::Canvas(_fieldSize.x * 4, _fieldSize.y * 4);
+        for (int row = 0; row < _fieldSize.y; ++row) {
+            for (int column = 0; column < _fieldSize.x; ++column) {
+                drawCell(
+                    c,
+                    {column, row},
+                    row == _mouse.y && column == _mouse.x
+                        ? ftxui::Color{ftxui::Color::Blue}
+                        : _field[row][column]
+                              ? ftxui::Color{ftxui::Color::White}
+                              : ftxui::Color{ftxui::Color::Grey11}
+                );
+            }
+        }
+        return canvas(std::move(c));
+    });
+
+    const auto cellRenderAreaEventHandler = CatchEvent(cellRenderArea, [this](ftxui::Event e) {
+        if (e.is_mouse()) {
+            const auto& [button, motion, shift, meta, control, x, y] = e.mouse();
+            // Minus 1 for the border.
+            _mouse = {(x - 1) / 2, y - 1};
+            if (_mouse.x >= 0 && _mouse.x < _fieldSize.x &&
+                _mouse.y >= 0 && _mouse.y < _fieldSize.y) {
+                switch (button) {
+                    case ftxui::Mouse::Left: {
+                        _field[_mouse.y][_mouse.x] = true;
+                        break;
+                    }
+                    case ftxui::Mouse::Right: {
+                        _field[_mouse.y][_mouse.x] = false;
+                        break;
+                    }
+                    default: {
+                        break;
+                    }
+                }
+            }
+        } else if (e.is_character()) {
+            switch (e.character()[0]) {
+                case 'c': {
+                    reset();
+                    break;
+                }
+                case 'r': {
+                    randomize();
+                    break;
+                }
+                case ' ': {
+                    _updateField();
+                }
+                default: {
+                    break;
+                }
+            }
+        }
+        return false;
+    });
+
+    auto screen = ftxui::ScreenInteractive::FitComponent();
+    screen.Loop(cellRenderAreaEventHandler | ftxui::border);
 }
 
 void GameOfLife::_updateField() {
