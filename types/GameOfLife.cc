@@ -43,63 +43,11 @@ void GameOfLife::run() {
 
     const auto saveListContainer = Container::Vertical({});
     for (int index = 0; index < _saveList.size(); ++index) {
-        auto saveButton = Button(
-            "Save",
-            [this, index] {
-                _saveList[index].save(_fieldManager.getField());
-            },
-            [this] {
-                ButtonOption option;
-                option.transform = [this](const EntryState& s) {
-                    auto element = text(s.label) | center | border;
-                    if (s.active) {
-                        element |= bold;
-                    }
-                    return element;
-                };
-                option.animated_colors.foreground.Set(Color::White, Color::DeepSkyBlue1);
-                option.animated_colors.background.Set(Color::Default, Color::Default);
-                return option;
-            }()
-        );
-        auto loadButton = Button(
-            "Load",
-            [this, index] {
-                _fieldManager.setField(_saveList[index].load());
-            },
-            [this] {
-                ButtonOption option;
-                option.transform = [this](const EntryState& s) {
-                    auto element = text(s.label) | center | border;
-                    if (s.active) {
-                        element |= bold;
-                    }
-                    return element;
-                };
-                option.animated_colors.foreground.Set(Color::White, Color::DeepSkyBlue1);
-                option.animated_colors.background.Set(Color::Default, Color::Default);
-                return option;
-            }()
-        );
-        auto deleteButton = Button(
-            "Delete",
-            [this, index] {
-                _saveList.erase(_saveList.begin() + index);
-            },
-            [this] {
-                ButtonOption option;
-                option.transform = [this](const EntryState& s) {
-                    auto element = text(s.label) | center | border;
-                    if (s.active) {
-                        element |= bold;
-                    }
-                    return element;
-                };
-                option.animated_colors.foreground.Set(Color::White, Color::RedLight);
-                option.animated_colors.background.Set(Color::Default, Color::Default);
-                return option;
-            }()
-        );
+        const auto [
+            loadButton,
+            saveButton,
+            deleteButton
+        ] = _createSaveButtons(index);
         const auto saveInfo = Renderer([&, this, index] {
             const auto [saveDate, saveTime] = _saveList[index].getSaveTime();
             return vbox({
@@ -290,28 +238,6 @@ GameOfLife::_createFieldSizeInputs(string& heightString, string& widthString) {
     return {move(heightInput), move(widthInput)};
 }
 
-Component GameOfLife::_createPlaybackIntervalInput(string& playbackIntervalString) {
-    using namespace ftxui;
-
-    return Input(&playbackIntervalString)
-           | CatchEvent([&](const Event& event) {
-               return event.is_character() && !isdigit(event.character()[0]) && playbackIntervalString.length() < 4;
-           })
-           | CatchEvent([&](const Event& event) {
-               if (event == Event::Return) {
-                   if (const auto playbackInterval = playbackIntervalString.empty() ? 0 : stoi(playbackIntervalString);
-                       playbackInterval >= 10 && playbackInterval <= 5000) {
-                       _fieldManager.playbackInterval.store(chrono::milliseconds(playbackInterval));
-                   } else {
-                       playbackIntervalString = to_string(_fieldManager.playbackInterval.load().count());
-                   }
-                   _panelIndex = 1;
-                   return true;
-               }
-               return false;
-           });
-}
-
 tuple<Component, Component, Component> GameOfLife::_createControlButtons() {
     auto previousIterationButton = Button(
         "<-",
@@ -375,6 +301,28 @@ tuple<Component, Component, Component> GameOfLife::_createControlButtons() {
     return {move(previousIterationButton), move(togglePlayPauseButton), move(nextIterationButton)};
 }
 
+Component GameOfLife::_createPlaybackIntervalInput(string& playbackIntervalString) {
+    using namespace ftxui;
+
+    return Input(&playbackIntervalString)
+           | CatchEvent([&](const Event& event) {
+               return event.is_character() && !isdigit(event.character()[0]) && playbackIntervalString.length() < 4;
+           })
+           | CatchEvent([&](const Event& event) {
+               if (event == Event::Return) {
+                   if (const auto playbackInterval = playbackIntervalString.empty() ? 0 : stoi(playbackIntervalString);
+                       playbackInterval >= 10 && playbackInterval <= 5000) {
+                       _fieldManager.playbackInterval.store(chrono::milliseconds(playbackInterval));
+                   } else {
+                       playbackIntervalString = to_string(_fieldManager.playbackInterval.load().count());
+                   }
+                   _panelIndex = 1;
+                   return true;
+               }
+               return false;
+           });
+}
+
 Component GameOfLife::_createRandomizeButton() {
     return Button(
         "Randomize",
@@ -417,6 +365,67 @@ Component GameOfLife::_createResetButton() {
             return option;
         }()
     );
+}
+
+tuple<Component, Component, Component> GameOfLife::_createSaveButtons(const int index) {
+    auto loadButton = Button(
+        "Load",
+        [this, index] {
+            _fieldManager.setField(_saveList[index].load());
+        },
+        [this] {
+            ButtonOption option;
+            option.transform = [this](const EntryState& s) {
+                auto element = text(s.label) | center | border;
+                if (s.active) {
+                    element |= bold;
+                }
+                return element;
+            };
+            option.animated_colors.foreground.Set(Color::White, Color::DeepSkyBlue1);
+            option.animated_colors.background.Set(Color::Default, Color::Default);
+            return option;
+        }()
+    );
+    auto saveButton = Button(
+        "Save",
+        [this, index] {
+            _saveList[index].save(_fieldManager.getField());
+        },
+        [this] {
+            ButtonOption option;
+            option.transform = [this](const EntryState& s) {
+                auto element = text(s.label) | center | border;
+                if (s.active) {
+                    element |= bold;
+                }
+                return element;
+            };
+            option.animated_colors.foreground.Set(Color::White, Color::DeepSkyBlue1);
+            option.animated_colors.background.Set(Color::Default, Color::Default);
+            return option;
+        }()
+    );
+    auto deleteButton = Button(
+        "Delete",
+        [this, index] {
+            _saveList.erase(_saveList.begin() + index);
+        },
+        [this] {
+            ButtonOption option;
+            option.transform = [this](const EntryState& s) {
+                auto element = text(s.label) | center | border;
+                if (s.active) {
+                    element |= bold;
+                }
+                return element;
+            };
+            option.animated_colors.foreground.Set(Color::White, Color::RedLight);
+            option.animated_colors.background.Set(Color::Default, Color::Default);
+            return option;
+        }()
+    );
+    return {move(loadButton), move(saveButton), move(deleteButton)};
 }
 
 void GameOfLife::_handleNormalKeysEvent(const string& keys) {

@@ -29,13 +29,15 @@ namespace types {
             std::string& widthString
         );
 
-        ftxui::Component _createPlaybackIntervalInput(std::string& playbackIntervalString);
-
         std::tuple<ftxui::Component, ftxui::Component, ftxui::Component> _createControlButtons();
+
+        ftxui::Component _createPlaybackIntervalInput(std::string& playbackIntervalString);
 
         ftxui::Component _createRandomizeButton();
 
         ftxui::Component _createResetButton();
+
+        std::tuple<ftxui::Component, ftxui::Component, ftxui::Component> _createSaveButtons(int index);
 
         void _handleNormalKeysEvent(const std::string& keys);
 
