@@ -6,6 +6,7 @@
 #include <types/GameOfLife.h>
 #include <utils/console.h>
 
+using namespace ftxui;
 using namespace std;
 using namespace types;
 using namespace utils;
@@ -13,84 +14,316 @@ using namespace utils;
 namespace {
     constexpr auto cell = "██";
 
-    void drawCell(ftxui::Canvas& c, const Point& mouse, const ftxui::Color color) {
+    void drawCell(Canvas& c, const Point& mouse, const Color color) {
         c.DrawText(4 * mouse.x, 4 * mouse.y, cell, color);
     }
 }
 
-GameOfLife::GameOfLife(const int height, const int width) : _fieldManager(height, width) {
+GameOfLife::GameOfLife(const int height, const int width)
+    : _fieldManager(height, width), _fieldSize(width, height) {
     console::setConsoleSize(height + 2, width + 2);
 }
 
 void GameOfLife::run() {
-    const auto cellRenderArea = ftxui::Renderer([this] {
-        return _createCellCanvas();
-    });
+    constexpr auto textWidth = 12;
+    auto heightString = to_string(_fieldSize.y),
+            playbackIntervalString = to_string(_fieldManager.playbackInterval.load().count()),
+            widthString = to_string(_fieldSize.x);
 
-    const auto cellRenderAreaEventHandler = CatchEvent(cellRenderArea, [this](ftxui::Event e) {
-        if (e == ftxui::Event::ArrowRight) {
-            _fieldManager.nextIteration();
-        } else if (e == ftxui::Event::ArrowLeft) {
-            _fieldManager.previousIteration();
-        } else if (e.is_character()) {
-            _handleNormalKeysEvent(e.character());
-        } else if (e.is_mouse()) {
-            _handleMouseEvent(e.mouse());
+    const auto [
+        heightInput,
+        widthInput
+    ] = _createFieldSizeInputs(heightString, widthString);
+    const auto playbackIntervalInput = _createPlaybackIntervalInput(playbackIntervalString);
+    const auto [
+        previousIterationButton,
+        togglePlayPauseButton,
+        nextIterationButton
+    ] = _createControlButtons();
+    const auto randomizeButton = _createRandomizeButton();
+    const auto resetButton = _createResetButton();
+    const auto controlRenderer = Renderer(
+        Container::Vertical({
+            widthInput,
+            heightInput,
+            playbackIntervalInput,
+            Container::Horizontal({previousIterationButton, togglePlayPauseButton, nextIterationButton}),
+            Container::Horizontal({randomizeButton, resetButton})
+        }),
+        [&] {
+            return vbox({
+                text("Control Panel") | hcenter | bold,
+                separator(),
+                hbox({
+                    text("Width: ") | align_right | size(WIDTH, EQUAL, textWidth),
+                    widthInput->Render() | flex,
+                }),
+                hbox({
+                    text("Height: ") | align_right | size(WIDTH, EQUAL, textWidth),
+                    heightInput->Render() | flex,
+                }),
+                separator(),
+                hbox({
+                    text("Interval: ") | align_right | size(WIDTH, EQUAL, textWidth),
+                    playbackIntervalInput->Render() | flex,
+                }),
+                hbox({
+                    previousIterationButton->Render(),
+                    togglePlayPauseButton->Render() | flex,
+                    nextIterationButton->Render(),
+                }),
+                hbox({randomizeButton->Render() | flex, resetButton->Render()})
+            });
         }
-        return false;
-    });
+    );
 
-    auto screen = ftxui::ScreenInteractive::FitComponent();
+    const auto cellEventHandler = _createCellRenderer();
+
+    const auto pageRenderer = Renderer(
+        Container::Horizontal({controlRenderer, cellEventHandler}, &_panelIndex),
+        [&] {
+            return hflow({
+                controlRenderer->Render() | size(WIDTH, EQUAL, 20) | flex | border,
+                cellEventHandler->Render() | border
+            });
+        }
+    );
+
+    auto screen = ScreenInteractive::FitComponent();
     thread([&] {
         while (true) {
             this_thread::sleep_for(chrono::nanoseconds(16666666));
-            screen.PostEvent(ftxui::Event::Custom);
+            screen.PostEvent(Event::Custom);
         }
     }).detach();
-    screen.Loop(cellRenderAreaEventHandler | ftxui::border);
+    screen.Loop(pageRenderer);
 }
 
-ftxui::Element GameOfLife::_createCellCanvas() const {
-    const auto field = _fieldManager.getField();
-    const auto width = static_cast<int>(field.size());
-    const auto height = static_cast<int>(field[0].size());
-    const auto mouse = _mouse.load();
-    auto c = ftxui::Canvas(width * 4, height * 4);
-    for (const auto& [x,y]: views::cartesian_product(
-             views::iota(0, width),
-             views::iota(0, height))) {
-        drawCell(
-            c,
-            {x, y},
-            x == mouse.x && y == mouse.y
-                ? ftxui::Color{ftxui::Color::Grey50}
-                : field[x][y]
-                      ? ftxui::Color{ftxui::Color::White}
-                      : ftxui::Color{ftxui::Color::Grey11}
-        );
-    }
+Component GameOfLife::_createCellRenderer() {
+    return Renderer([this] {
+        const auto field = _fieldManager.getField();
+        const auto width = static_cast<int>(field.size());
+        const auto height = static_cast<int>(field[0].size());
+        const auto mouse = _mouse.load();
+        auto c = Canvas(width * 4, height * 4);
+        for (const auto& [x,y]: views::cartesian_product(views::iota(0, width), views::iota(0, height))) {
+            drawCell(
+                c,
+                {x, y},
+                x == mouse.x && y == mouse.y
+                    ? Color{Color::Grey50}
+                    : field[x][y]
+                          ? Color{Color::White}
+                          : Color{Color::Grey11}
+            );
+        }
 
-    // // The IDE doesn't like this, but it compiles and works.
-    // // Related issue: [CPP-36762](https://youtrack.jetbrains.com/issue/CPP-36762)
-    // ranges::for_each(
-    //     ranges::views::cartesian_product(
-    //         ranges::views::iota(0, _fieldSize.x),
-    //         ranges::views::iota(0, _fieldSize.y)
-    //     ),
-    //     [&](const auto& pair) {
-    //         const auto& [x, y] = pair;
-    //         drawCell(
-    //             c,
-    //             {x, y},
-    //             x == _mouse.x && y == _mouse.y
-    //                 ? ftxui::Color{ftxui::Color::Grey50}
-    //                 : _field[x][y]
-    //                       ? ftxui::Color{ftxui::Color::White}
-    //                       : ftxui::Color{ftxui::Color::Grey11}
-    //         );
-    //     }
-    // );
-    return canvas(move(c));
+        // // The IDE doesn't like this, but it compiles and works.
+        // // Related issue: [CPP-36762](https://youtrack.jetbrains.com/issue/CPP-36762)
+        // ranges::for_each(
+        //     ranges::views::cartesian_product(
+        //         ranges::views::iota(0, _fieldSize.x),
+        //         ranges::views::iota(0, _fieldSize.y)
+        //     ),
+        //     [&](const auto& pair) {
+        //         const auto& [x, y] = pair;
+        //         drawCell(
+        //             c,
+        //             {x, y},
+        //             x == _mouse.x && y == _mouse.y
+        //                 ? Color{Color::Grey50}
+        //                 : _field[x][y]
+        //                       ? Color{Color::White}
+        //                       : Color{Color::Grey11}
+        //         );
+        //     }
+        // );
+        return canvas(move(c));
+    }) | CatchEvent([this](Event event) {
+        if (event == Event::ArrowRight) {
+            _fieldManager.nextIteration();
+        } else if (event == Event::ArrowLeft) {
+            _fieldManager.previousIteration();
+        } else if (event.is_character()) {
+            _handleNormalKeysEvent(event.character());
+        } else if (event.is_mouse()) {
+            _handleMouseEvent(event.mouse());
+        }
+        return true;
+    });
+}
+
+tuple<Component, Component>
+GameOfLife::_createFieldSizeInputs(string& heightString, string& widthString) {
+    using namespace ftxui;
+
+    auto widthInput = Input(&widthString)
+                      | CatchEvent([&](const Event& event) {
+                          return event.is_character() && !isdigit(event.character()[0]) && widthString.length() < 2;
+                      })
+                      | CatchEvent([&](const Event& event) {
+                          if (event == Event::Return) {
+                              if (const auto width = widthString.empty() ? 0 : stoi(widthString);
+                                  width > 0 && width != _fieldSize.x && width <= 25) {
+                                  _fieldSize.x = width;
+                                  _fieldManager.setField(_fieldSize);
+                              } else {
+                                  widthString = to_string(_fieldSize.x);
+                              }
+                              _panelIndex = 1;
+                              return true;
+                          }
+                          return false;
+                      });
+    auto heightInput = Input(&heightString)
+                       | CatchEvent([&](const Event& event) {
+                           return event.is_character() && !isdigit(event.character()[0]) && heightString.length() < 2;
+                       })
+                       | CatchEvent([&](const Event& event) {
+                           if (event == Event::Return) {
+                               if (const auto height = heightString.empty() ? 0 : stoi(heightString);
+                                   height > 0 && height != _fieldSize.y && height <= 25) {
+                                   _fieldSize.y = height;
+                                   _fieldManager.setField(_fieldSize);
+                               } else {
+                                   heightString = to_string(_fieldSize.x);
+                               }
+                               _panelIndex = 1;
+                               return true;
+                           }
+                           return false;
+                       });
+
+    return {move(heightInput), move(widthInput)};
+}
+
+Component GameOfLife::_createPlaybackIntervalInput(string& playbackIntervalString) {
+    using namespace ftxui;
+
+    return Input(&playbackIntervalString)
+           | CatchEvent([&](const Event& event) {
+               return event.is_character() && !isdigit(event.character()[0]) && playbackIntervalString.length() < 4;
+           })
+           | CatchEvent([&](const Event& event) {
+               if (event == Event::Return) {
+                   if (const auto playbackInterval = playbackIntervalString.empty() ? 0 : stoi(playbackIntervalString);
+                       playbackInterval >= 10 && playbackInterval <= 5000) {
+                       _fieldManager.playbackInterval.store(chrono::milliseconds(playbackInterval));
+                   } else {
+                       playbackIntervalString = to_string(_fieldManager.playbackInterval.load().count());
+                   }
+                   _panelIndex = 1;
+                   return true;
+               }
+               return false;
+           });
+}
+
+tuple<Component, Component, Component> GameOfLife::_createControlButtons() {
+    auto previousIterationButton = Button(
+        "<-",
+        [this] {
+            _fieldManager.isPlaying.store(false);
+            _fieldManager.previousIteration();
+        },
+        [this] {
+            ButtonOption option;
+            option.transform = [this](const EntryState& s) {
+                auto element = text(s.label) | center | border;
+                if (s.active) {
+                    element |= bold;
+                }
+                return element;
+            };
+            option.animated_colors.foreground.Set(Color::White, Color::DeepSkyBlue1);
+            option.animated_colors.background.Set(Color::Default, Color::Default);
+            return option;
+        }()
+    );
+    auto togglePlayPauseButton = Button(
+        "Start",
+        [this] {
+            _fieldManager.isPlaying.store(!_fieldManager.isPlaying.load());
+        },
+        [this] {
+            ButtonOption option;
+            option.transform = [this](const EntryState& s) {
+                auto element = text(_fieldManager.isPlaying.load() ? "Pause" : "Start") | center | border;
+                if (s.active) {
+                    element |= bold;
+                }
+                return element;
+            };
+            option.animated_colors.foreground.Set(Color::White, Color::LightGreen);
+            option.animated_colors.background.Set(Color::Default, Color::Default);
+            return option;
+        }()
+    );
+    auto nextIterationButton = Button(
+        "->",
+        [this] {
+            _fieldManager.isPlaying.store(false);
+            _fieldManager.nextIteration();
+        },
+        [this] {
+            ButtonOption option;
+            option.transform = [this](const EntryState& s) {
+                auto element = text(s.label) | center | border;
+                if (s.active) {
+                    element |= bold;
+                }
+                return element;
+            };
+            option.animated_colors.foreground.Set(Color::White, Color::DeepSkyBlue1);
+            option.animated_colors.background.Set(Color::Default, Color::Default);
+            return option;
+        }()
+    );
+    return {move(previousIterationButton), move(togglePlayPauseButton), move(nextIterationButton)};
+}
+
+Component GameOfLife::_createRandomizeButton() {
+    return Button(
+        "Randomize",
+        [this] {
+            _fieldManager.randomize();
+        },
+        [this] {
+            ButtonOption option;
+            option.transform = [this](const EntryState& s) {
+                auto element = text(s.label) | center | border;
+                if (s.active) {
+                    element |= bold;
+                }
+                return element;
+            };
+            option.animated_colors.foreground.Set(Color::White, Color::Gold1);
+            option.animated_colors.background.Set(Color::Default, Color::Default);
+            return option;
+        }()
+    );
+}
+
+Component GameOfLife::_createResetButton() {
+    return Button(
+        "Reset",
+        [this] {
+            _fieldManager.reset();
+        },
+        [this] {
+            ButtonOption option;
+            option.transform = [this](const EntryState& s) {
+                auto element = text(s.label) | center | border;
+                if (s.active) {
+                    element |= bold;
+                }
+                return element;
+            };
+            option.animated_colors.foreground.Set(Color::White, Color::RedLight);
+            option.animated_colors.background.Set(Color::Default, Color::Default);
+            return option;
+        }()
+    );
 }
 
 void GameOfLife::_handleNormalKeysEvent(const string& keys) {
@@ -104,7 +337,7 @@ void GameOfLife::_handleNormalKeysEvent(const string& keys) {
             break;
         }
         case ' ': {
-            _fieldManager.togglePlayPause();
+            _fieldManager.isPlaying.store(!_fieldManager.isPlaying.load());
         }
         default: {
             break;
@@ -112,21 +345,25 @@ void GameOfLife::_handleNormalKeysEvent(const string& keys) {
     }
 }
 
-void GameOfLife::_handleMouseEvent(const ftxui::Mouse& mouseEvent) {
+void GameOfLife::_handleMouseEvent(const Mouse& mouseEvent) {
     const auto& [button, motion, shift, meta, control, x, y] = mouseEvent;
     // Minus 1 for the border.
-    const auto mouseInCanvas = Point{(x - 1) / 2, y - 1};
-    switch (button) {
-        case ftxui::Mouse::Left: {
-            _fieldManager.setCell(mouseInCanvas, true);
-            break;
-        }
-        case ftxui::Mouse::Right: {
-            _fieldManager.setCell(mouseInCanvas, false);
-            break;
-        }
-        default: {
-            break;
+    const auto mouseInCanvas = Point{(x - 23) / 2, y - 1};
+    if (mouseInCanvas.x >= 0 && mouseInCanvas.x < _fieldSize.x
+        && mouseInCanvas.y >= 0 && mouseInCanvas.y < _fieldSize.y) {
+        _panelIndex = 1;
+        switch (button) {
+            case Mouse::Left: {
+                _fieldManager.setCell(mouseInCanvas, true);
+                break;
+            }
+            case Mouse::Right: {
+                _fieldManager.setCell(mouseInCanvas, false);
+                break;
+            }
+            default: {
+                break;
+            }
         }
     }
     _mouse.store(mouseInCanvas);

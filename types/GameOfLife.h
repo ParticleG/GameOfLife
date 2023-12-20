@@ -15,9 +15,24 @@ namespace types {
 
     private:
         FieldManager _fieldManager;
+        Point _fieldSize;
+        int _panelIndex{1};
         std::atomic<Point> _mouse;
 
-        ftxui::Element _createCellCanvas() const;
+        ftxui::Component _createCellRenderer();
+
+        std::tuple<ftxui::Component, ftxui::Component> _createFieldSizeInputs(
+            std::string& heightString,
+            std::string& widthString
+        );
+
+        ftxui::Component _createPlaybackIntervalInput(std::string& playbackIntervalString);
+
+        std::tuple<ftxui::Component, ftxui::Component, ftxui::Component> _createControlButtons();
+
+        ftxui::Component _createRandomizeButton();
+
+        ftxui::Component _createResetButton();
 
         void _handleNormalKeysEvent(const std::string& keys);
 

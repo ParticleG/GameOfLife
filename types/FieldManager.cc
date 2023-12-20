@@ -10,7 +10,7 @@ using namespace std;
 using namespace types;
 
 FieldManager::FieldManager(const int height, const int width)
-    : _fieldSize(width, height), _playbackInterval(chrono::milliseconds(250)) {
+    : playbackInterval(chrono::milliseconds(250)) {
     _field.resize(width);
     ranges::for_each(
         _field,
@@ -24,6 +24,11 @@ FieldManager::FieldManager(const int height, const int width)
 Field FieldManager::getField() const {
     shared_lock lock(_fieldMutex);
     return _field;
+}
+
+uint64_t FieldManager::getIteration() const {
+    shared_lock lock(_historyMutex);
+    return _history.size();
 }
 
 void FieldManager::nextIteration() {
@@ -74,16 +79,11 @@ void FieldManager::nextIteration() {
     }
 }
 
-void FieldManager::pause() {
-    _isPlaying.store(false);
-}
-
-void FieldManager::play() {
-    _isPlaying.store(true);
-}
-
 void FieldManager::previousIteration() {
     unique_lock lock(_historyMutex);
+    if (_history.empty()) {
+        return;
+    }
     _field = _history.back();
     _history.pop_back();
 }
@@ -129,21 +129,31 @@ void FieldManager::setCell(const Point point, const bool value) {
     } catch (...) {}
 }
 
-void FieldManager::setPlaybackInterval(const std::chrono::milliseconds interval) {
-    _playbackInterval.store(interval);
+void FieldManager::setField(const Point size) { {
+        unique_lock lock(_fieldMutex);
+        _field.resize(size.x);
+        ranges::for_each(
+            _field,
+            [&](auto& sub) {
+                sub.resize(size.y);
+            }
+        );
+    }
+    unique_lock lock(_historyMutex);
+    _history.clear();
 }
 
-void FieldManager::togglePlayPause() {
-    _isPlaying.store(!_isPlaying.load());
+void FieldManager::setPlaybackInterval(const std::chrono::milliseconds interval) {
+    playbackInterval.store(interval);
 }
 
 void FieldManager::_playbackThread() {
     thread([this] {
         while (true) {
-            if (_isPlaying.load()) {
+            if (isPlaying.load()) {
                 nextIteration();
             }
-            this_thread::sleep_for(_playbackInterval.load());
+            this_thread::sleep_for(playbackInterval.load());
         }
     }).detach();
 }
