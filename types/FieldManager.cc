@@ -18,7 +18,6 @@ FieldManager::FieldManager(const int height, const int width)
             sub.resize(height);
         }
     );
-    _history.emplace_back(_field);
     _playbackThread();
 }
 
@@ -28,37 +27,50 @@ Field FieldManager::getField() const {
 }
 
 void FieldManager::nextIteration() {
-    Field newField; {
-        shared_lock lock(_fieldMutex);
-        newField = _field;
-        // TODO: Simplify this
-        for (uint64_t x = 0; x < _field.size(); ++x) {
-            for (uint64_t y = 0; y < _field[x].size(); ++y) {
-                uint64_t neighbours{};
-                for (int64_t i = -1; i <= 1; ++i) {
-                    for (int64_t j = -1; j <= 1; ++j) {
-                        const auto xCoord = static_cast<int64_t>(x) + i;
-                        const auto yCoord = static_cast<int64_t>(y) + j;
+    vector<vector<int>> neighbourCountField;
+    Field nextField; {
+        shared_lock fieldLock(_fieldMutex);
+        unique_lock historyLock(_historyMutex);
+        nextField = _field;
+        _history.push_back(_field);
+    }
+    neighbourCountField.resize(nextField.size());
+    ranges::for_each(
+        neighbourCountField,
+        [&](auto& sub) {
+            sub.resize(nextField[0].size());
+        }
+    );
+    for (int x = 0; x < nextField.size(); ++x) {
+        for (int y = 0; y < nextField[x].size(); ++y) {
+            int neighbours{};
+            for (int64_t dx = -1; dx <= 1; ++dx) {
+                for (int64_t dy = -1; dy <= 1; ++dy) {
+                    const auto xCoord = x + dx;
+                    const auto yCoord = y + dy;
 
-                        if (!(i == 0 && j == 0) &&
-                            xCoord >= 0 && yCoord >= 0 &&
-                            xCoord < static_cast<int64_t>(_field.size()) &&
-                            yCoord < static_cast<int64_t>(_field[xCoord].size()) &&
-                            _field[xCoord][yCoord]) {
-                            ++neighbours;
-                        }
+                    if (!(dx == 0 && dy == 0) &&
+                        xCoord >= 0 && yCoord >= 0 &&
+                        xCoord < static_cast<int64_t>(nextField.size()) &&
+                        yCoord < static_cast<int64_t>(nextField[xCoord].size()) &&
+                        _field[xCoord][yCoord]) {
+                        ++neighbours;
                     }
                 }
-                // TODO: Make this customizable
-                newField[x][y] = (_field[x][y] && (neighbours == 2 || neighbours == 3)) ||
-                                 (!_field[x][y] && neighbours == 3);
             }
+            neighbourCountField[x][y] = neighbours;
+        }
+    }
+
+    for (uint64_t x = 0; x < neighbourCountField.size(); ++x) {
+        for (uint64_t y = 0; y < neighbourCountField[x].size(); ++y) {
+            const auto& currentNeighbours = neighbourCountField[x][y];
+            nextField[x][y] = (nextField[x][y] && (currentNeighbours == 2 || currentNeighbours == 3)) ||
+                              (!nextField[x][y] && currentNeighbours == 3);
         }
     } {
-        unique_lock fieldLock(_fieldMutex);
-        unique_lock historyLock(_historyMutex);
-        _field = newField;
-        _history.emplace_back(move(newField));
+        unique_lock lock(_fieldMutex);
+        _field = nextField;
     }
 }
 
@@ -70,12 +82,15 @@ void FieldManager::play() {
     _isPlaying.store(true);
 }
 
-void FieldManager::previousIteration() {}
+void FieldManager::previousIteration() {
+    unique_lock lock(_historyMutex);
+    _field = _history.back();
+    _history.pop_back();
+}
 
 void FieldManager::randomize() {
     mt19937 gen(random_device{}());
-    uniform_int_distribution distrib(0, 1);
-    {
+    uniform_int_distribution distrib(0, 1); {
         unique_lock lock(_fieldMutex);
         ranges::for_each(
             _field,
@@ -86,11 +101,11 @@ void FieldManager::randomize() {
             }
         );
     }
-    _resetHistory();
+    unique_lock lock(_historyMutex);
+    _history.clear();
 }
 
-void FieldManager::reset() {
-    {
+void FieldManager::reset() { {
         unique_lock lock(_fieldMutex);
         ranges::for_each(
             _field,
@@ -99,7 +114,8 @@ void FieldManager::reset() {
             }
         );
     }
-    _resetHistory();
+    unique_lock lock(_historyMutex);
+    _history.clear();
 }
 
 void FieldManager::setCell(const Point point, const bool value) {
@@ -108,7 +124,8 @@ void FieldManager::setCell(const Point point, const bool value) {
             unique_lock lock(_fieldMutex);
             _field.at(point.x).at(point.y) = value;
         }
-        _resetHistory();
+        unique_lock lock(_historyMutex);
+        _history.clear();
     } catch (...) {}
 }
 
@@ -129,21 +146,4 @@ void FieldManager::_playbackThread() {
             this_thread::sleep_for(_playbackInterval.load());
         }
     }).detach();
-}
-
-void FieldManager::_resetHistory() {
-    bool needClearHistory = false; {
-        shared_lock lock(_historyMutex);
-        if (_history.size() > 1) {
-            needClearHistory = true;
-        }
-    }
-    shared_lock fieldLock(_fieldMutex);
-    unique_lock historyLock(_historyMutex);
-    if (needClearHistory) {
-        _history.clear();
-        _history.emplace_back(_field);
-    } else {
-        _history.at(0) = _field;
-    }
 }

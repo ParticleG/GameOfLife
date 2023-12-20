@@ -42,7 +42,5 @@ namespace types {
         std::vector<Field> _history;
 
         void _playbackThread();
-
-        void _resetHistory();
     };
 }
