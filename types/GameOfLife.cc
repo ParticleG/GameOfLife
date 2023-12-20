@@ -1,13 +1,14 @@
-#include <algorithm>
-#include <random>
+#include <ranges>
 
-#include <ftxui/component/component.hpp>
 #include <ftxui/component/screen_interactive.hpp>
 
+#include <types/common.h>
 #include <types/GameOfLife.h>
+#include <utils/console.h>
 
 using namespace std;
 using namespace types;
+using namespace utils;
 
 namespace {
     constexpr auto cell = "██";
@@ -17,115 +18,20 @@ namespace {
     }
 }
 
-GameOfLife::GameOfLife(const uint64_t height, const uint64_t width) : _fieldSize(width, height) {
-    _field.resize(width);
-    ranges::for_each(
-        _field,
-        [&](auto& sub) {
-            sub.resize(height);
-        }
-    );
-}
-
-void GameOfLife::randomize() {
-    mt19937 gen(random_device{}());
-    uniform_int_distribution distrib(0, 1);
-    ranges::for_each(
-        _field,
-        [&](auto& sub) {
-            ranges::generate(sub.begin(), sub.end(), [&] {
-                return distrib(gen);
-            });
-        }
-    );
-}
-
-void GameOfLife::reset() {
-    ranges::for_each(
-        _field,
-        [&](auto& sub) {
-            ranges::fill(sub, false);
-        }
-    );
+GameOfLife::GameOfLife(const int height, const int width) : _fieldManager(height, width) {
+    console::setConsoleSize(height + 2, width + 2);
 }
 
 void GameOfLife::run() {
     const auto cellRenderArea = ftxui::Renderer([this] {
-        auto c = ftxui::Canvas(_fieldSize.x * 4, _fieldSize.y * 4);
-        for (const auto& [x,y]: views::cartesian_product(
-                 views::iota(0, _fieldSize.x),
-                 views::iota(0, _fieldSize.y))) {
-            drawCell(
-                c,
-                {x, y},
-                x == _mouse.x && y == _mouse.y
-                    ? ftxui::Color{ftxui::Color::Grey50}
-                    : _field[x][y]
-                          ? ftxui::Color{ftxui::Color::White}
-                          : ftxui::Color{ftxui::Color::Grey11}
-            );
-        }
-
-        // // The IDE doesn't like this, but it compiles and works.
-        // // Related issue: [CPP-36762](https://youtrack.jetbrains.com/issue/CPP-36762)
-        // ranges::for_each(
-        //     ranges::views::cartesian_product(
-        //         ranges::views::iota(0, _fieldSize.x),
-        //         ranges::views::iota(0, _fieldSize.y)
-        //     ),
-        //     [&](const auto& pair) {
-        //         const auto& [x, y] = pair;
-        //         drawCell(
-        //             c,
-        //             {x, y},
-        //             x == _mouse.x && y == _mouse.y
-        //                 ? ftxui::Color{ftxui::Color::Grey50}
-        //                 : _field[x][y]
-        //                       ? ftxui::Color{ftxui::Color::White}
-        //                       : ftxui::Color{ftxui::Color::Grey11}
-        //         );
-        //     }
-        // );
-        return canvas(move(c));
+        return _createCellCanvas();
     });
 
     const auto cellRenderAreaEventHandler = CatchEvent(cellRenderArea, [this](ftxui::Event e) {
-        if (e.is_mouse()) {
-            const auto& [button, motion, shift, meta, control, x, y] = e.mouse();
-            // Minus 1 for the border.
-            _mouse = {(x - 1) / 2, y - 1};
-            try {
-                switch (button) {
-                    case ftxui::Mouse::Left: {
-                        _field.at(_mouse.x).at(_mouse.y) = true;
-                        break;
-                    }
-                    case ftxui::Mouse::Right: {
-                        _field.at(_mouse.x).at(_mouse.y) = false;
-                        break;
-                    }
-                    default: {
-                        break;
-                    }
-                }
-            } catch (...) {}
-        } else if (e.is_character()) {
-            switch (e.character()[0]) {
-                case 'c': {
-                    reset();
-                    break;
-                }
-                case 'r': {
-                    randomize();
-                    break;
-                }
-                case ' ': {
-                    _updateField();
-                }
-                default: {
-                    break;
-                }
-            }
+        if (e.is_character()) {
+            _handleKeyboardEvent(e.character());
+        } else if (e.is_mouse()) {
+            _handleMouseEvent(e.mouse());
         }
         return false;
     });
@@ -134,54 +40,84 @@ void GameOfLife::run() {
     screen.Loop(cellRenderAreaEventHandler | ftxui::border);
 }
 
-void GameOfLife::_updateField() {
-    auto newField(_field);
-
-    for (uint64_t i = 0; i < _field.size(); ++i) {
-        for (uint64_t j = 0; j < _field[i].size(); ++j) {
-            const auto neighbours = _countNeighbours(i, j);
-
-            if (_field[i][j]) {
-                if (neighbours < 2 || neighbours > 3) {
-                    newField[i][j] = false;
-                }
-            } else {
-                if (neighbours == 3) {
-                    newField[i][j] = true;
-                }
-            }
-        }
+ftxui::Element GameOfLife::_createCellCanvas() const {
+    const auto field = _fieldManager.getField();
+    const auto width = static_cast<int>(field.size());
+    const auto height = static_cast<int>(field[0].size());
+    const auto mouse = _mouse.load();
+    auto c = ftxui::Canvas(width * 4, height * 4);
+    for (const auto& [x,y]: views::cartesian_product(
+             views::iota(0, width),
+             views::iota(0, height))) {
+        drawCell(
+            c,
+            {x, y},
+            x == mouse.x && y == mouse.y
+                ? ftxui::Color{ftxui::Color::Grey50}
+                : field[x][y]
+                      ? ftxui::Color{ftxui::Color::White}
+                      : ftxui::Color{ftxui::Color::Grey11}
+        );
     }
 
-    _field = newField;
+    // // The IDE doesn't like this, but it compiles and works.
+    // // Related issue: [CPP-36762](https://youtrack.jetbrains.com/issue/CPP-36762)
+    // ranges::for_each(
+    //     ranges::views::cartesian_product(
+    //         ranges::views::iota(0, _fieldSize.x),
+    //         ranges::views::iota(0, _fieldSize.y)
+    //     ),
+    //     [&](const auto& pair) {
+    //         const auto& [x, y] = pair;
+    //         drawCell(
+    //             c,
+    //             {x, y},
+    //             x == _mouse.x && y == _mouse.y
+    //                 ? ftxui::Color{ftxui::Color::Grey50}
+    //                 : _field[x][y]
+    //                       ? ftxui::Color{ftxui::Color::White}
+    //                       : ftxui::Color{ftxui::Color::Grey11}
+    //         );
+    //     }
+    // );
+    return canvas(move(c));
 }
 
-uint64_t GameOfLife::_countNeighbours(const uint64_t x, const uint64_t y) {
-    uint64_t count = 0;
-
-    for (int64_t i = -1; i <= 1; ++i) {
-        for (int64_t j = -1; j <= 1; ++j) {
-            if (i == 0 && j == 0) {
-                continue;
-            }
-
-            const auto xCoord = static_cast<int64_t>(x) + i;
-            const auto yCoord = static_cast<int64_t>(y) + j;
-
-            if (xCoord < 0 || yCoord < 0) {
-                continue;
-            }
-
-            if (xCoord >= static_cast<int64_t>(_field.size()) ||
-                yCoord >= static_cast<int64_t>(_field[xCoord].size())) {
-                continue;
-            }
-
-            if (_field[xCoord][yCoord]) {
-                ++count;
-            }
+void GameOfLife::_handleKeyboardEvent(const std::string& keys) {
+    switch (keys[0]) {
+        case 'c': {
+            _fieldManager.reset();
+            break;
+        }
+        case 'r': {
+            _fieldManager.randomize();
+            break;
+        }
+        case ' ': {
+            _fieldManager.nextIteration();
+        }
+        default: {
+            break;
         }
     }
+}
 
-    return count;
+void GameOfLife::_handleMouseEvent(const ftxui::Mouse& mouseEvent) {
+    const auto& [button, motion, shift, meta, control, x, y] = mouseEvent;
+    // Minus 1 for the border.
+    const auto mouseInCanvas = Point{(x - 1) / 2, y - 1};
+    switch (button) {
+        case ftxui::Mouse::Left: {
+            _fieldManager.updateCell(mouseInCanvas, true);
+            break;
+        }
+        case ftxui::Mouse::Right: {
+            _fieldManager.updateCell(mouseInCanvas, false);
+            break;
+        }
+        default: {
+            break;
+        }
+    }
+    _mouse.store(mouseInCanvas);
 }

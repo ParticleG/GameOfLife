@@ -1,29 +1,26 @@
 #pragma once
 
-#include <cstdint>
-#include <vector>
+#include <ftxui/component/component.hpp>
 
-#include <types/common.h>
+#include <types/FieldManager.h>
 
 namespace types {
     class GameOfLife {
     public:
-        GameOfLife(uint64_t height, uint64_t width);
-
-        void randomize();
-
-        void reset();
+        GameOfLife(int height, int width);
 
         ~GameOfLife() = default;
 
         void run();
 
     private:
-        Point _fieldSize, _mouse;
-        std::vector<std::vector<bool>> _field;
+        FieldManager _fieldManager;
+        std::atomic<Point> _mouse;
 
-        void _updateField();
+        ftxui::Element _createCellCanvas() const;
 
-        uint64_t _countNeighbours(uint64_t x, uint64_t y);
+        void _handleKeyboardEvent(const std::string& keys);
+
+        void _handleMouseEvent(const ftxui::Mouse& mouseEvent);
     };
 }
