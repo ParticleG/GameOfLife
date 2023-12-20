@@ -25,7 +25,7 @@ GameOfLife::GameOfLife(const int height, const int width)
 }
 
 void GameOfLife::run() {
-    constexpr auto textWidth = 12;
+    constexpr auto textWidth = 16;
     auto heightString = to_string(_fieldSize.y),
             playbackIntervalString = to_string(_fieldManager.playbackInterval.load().count()),
             widthString = to_string(_fieldSize.x);
@@ -124,7 +124,7 @@ void GameOfLife::run() {
         Container::Horizontal({controlRenderer, cellEventHandler}, &_panelIndex),
         [&] {
             return hflow({
-                controlRenderer->Render() | size(WIDTH, EQUAL, 20) | flex | border,
+                controlRenderer->Render() | size(WIDTH, EQUAL, 25) | flex | border,
                 cellEventHandler->Render() | border
             });
         }
