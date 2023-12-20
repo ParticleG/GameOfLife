@@ -19,7 +19,7 @@ namespace types {
 
         ftxui::Element _createCellCanvas() const;
 
-        void _handleKeyboardEvent(const std::string& keys);
+        void _handleNormalKeysEvent(const std::string& keys);
 
         void _handleMouseEvent(const ftxui::Mouse& mouseEvent);
     };

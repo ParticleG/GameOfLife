@@ -9,7 +9,8 @@
 using namespace std;
 using namespace types;
 
-FieldManager::FieldManager(const int height, const int width) : _fieldSize(width, height) {
+FieldManager::FieldManager(const int height, const int width)
+    : _fieldSize(width, height), _playbackInterval(chrono::milliseconds(250)) {
     _field.resize(width);
     ranges::for_each(
         _field,
@@ -17,35 +18,8 @@ FieldManager::FieldManager(const int height, const int width) : _fieldSize(width
             sub.resize(height);
         }
     );
-}
-
-void FieldManager::updateCell(Point point, bool value) {
-    unique_lock lock(_fieldMutex);
-    _field.at(point.x).at(point.y) = value;
-}
-
-void FieldManager::randomize() {
-    mt19937 gen(random_device{}());
-    uniform_int_distribution distrib(0, 1);
-    unique_lock lock(_fieldMutex);
-    ranges::for_each(
-        _field,
-        [&](auto& sub) {
-            ranges::generate(sub.begin(), sub.end(), [&] {
-                return distrib(gen);
-            });
-        }
-    );
-}
-
-void FieldManager::reset() {
-    unique_lock lock(_fieldMutex);
-    ranges::for_each(
-        _field,
-        [&](auto& sub) {
-            ranges::fill(sub, false);
-        }
-    );
+    _history.emplace_back(_field);
+    _playbackThread();
 }
 
 Field FieldManager::getField() const {
@@ -81,7 +55,95 @@ void FieldManager::nextIteration() {
             }
         }
     } {
-        unique_lock lock(_fieldMutex);
+        unique_lock fieldLock(_fieldMutex);
+        unique_lock historyLock(_historyMutex);
         _field = newField;
+        _history.emplace_back(move(newField));
+    }
+}
+
+void FieldManager::pause() {
+    _isPlaying.store(false);
+}
+
+void FieldManager::play() {
+    _isPlaying.store(true);
+}
+
+void FieldManager::previousIteration() {}
+
+void FieldManager::randomize() {
+    mt19937 gen(random_device{}());
+    uniform_int_distribution distrib(0, 1);
+    {
+        unique_lock lock(_fieldMutex);
+        ranges::for_each(
+            _field,
+            [&](auto& sub) {
+                ranges::generate(sub.begin(), sub.end(), [&] {
+                    return distrib(gen);
+                });
+            }
+        );
+    }
+    _resetHistory();
+}
+
+void FieldManager::reset() {
+    {
+        unique_lock lock(_fieldMutex);
+        ranges::for_each(
+            _field,
+            [&](auto& sub) {
+                ranges::fill(sub, false);
+            }
+        );
+    }
+    _resetHistory();
+}
+
+void FieldManager::setCell(const Point point, const bool value) {
+    try {
+        {
+            unique_lock lock(_fieldMutex);
+            _field.at(point.x).at(point.y) = value;
+        }
+        _resetHistory();
+    } catch (...) {}
+}
+
+void FieldManager::setPlaybackInterval(const std::chrono::milliseconds interval) {
+    _playbackInterval.store(interval);
+}
+
+void FieldManager::togglePlayPause() {
+    _isPlaying.store(!_isPlaying.load());
+}
+
+void FieldManager::_playbackThread() {
+    thread([this] {
+        while (true) {
+            if (_isPlaying.load()) {
+                nextIteration();
+            }
+            this_thread::sleep_for(_playbackInterval.load());
+        }
+    }).detach();
+}
+
+void FieldManager::_resetHistory() {
+    bool needClearHistory = false; {
+        shared_lock lock(_historyMutex);
+        if (_history.size() > 1) {
+            needClearHistory = true;
+        }
+    }
+    shared_lock fieldLock(_fieldMutex);
+    unique_lock historyLock(_historyMutex);
+    if (needClearHistory) {
+        _history.clear();
+        _history.emplace_back(_field);
+    } else {
+        _history.at(0) = _field;
     }
 }

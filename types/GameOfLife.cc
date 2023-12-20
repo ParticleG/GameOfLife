@@ -28,8 +28,12 @@ void GameOfLife::run() {
     });
 
     const auto cellRenderAreaEventHandler = CatchEvent(cellRenderArea, [this](ftxui::Event e) {
-        if (e.is_character()) {
-            _handleKeyboardEvent(e.character());
+        if (e == ftxui::Event::ArrowRight) {
+            _fieldManager.nextIteration();
+        } else if (e == ftxui::Event::ArrowLeft) {
+            _fieldManager.previousIteration();
+        } else if (e.is_character()) {
+            _handleNormalKeysEvent(e.character());
         } else if (e.is_mouse()) {
             _handleMouseEvent(e.mouse());
         }
@@ -37,6 +41,12 @@ void GameOfLife::run() {
     });
 
     auto screen = ftxui::ScreenInteractive::FitComponent();
+    thread([&] {
+        while (true) {
+            this_thread::sleep_for(chrono::nanoseconds(16666666));
+            screen.PostEvent(ftxui::Event::Custom);
+        }
+    }).detach();
     screen.Loop(cellRenderAreaEventHandler | ftxui::border);
 }
 
@@ -83,7 +93,7 @@ ftxui::Element GameOfLife::_createCellCanvas() const {
     return canvas(move(c));
 }
 
-void GameOfLife::_handleKeyboardEvent(const std::string& keys) {
+void GameOfLife::_handleNormalKeysEvent(const string& keys) {
     switch (keys[0]) {
         case 'c': {
             _fieldManager.reset();
@@ -94,7 +104,7 @@ void GameOfLife::_handleKeyboardEvent(const std::string& keys) {
             break;
         }
         case ' ': {
-            _fieldManager.nextIteration();
+            _fieldManager.togglePlayPause();
         }
         default: {
             break;
@@ -108,11 +118,11 @@ void GameOfLife::_handleMouseEvent(const ftxui::Mouse& mouseEvent) {
     const auto mouseInCanvas = Point{(x - 1) / 2, y - 1};
     switch (button) {
         case ftxui::Mouse::Left: {
-            _fieldManager.updateCell(mouseInCanvas, true);
+            _fieldManager.setCell(mouseInCanvas, true);
             break;
         }
         case ftxui::Mouse::Right: {
-            _fieldManager.updateCell(mouseInCanvas, false);
+            _fieldManager.setCell(mouseInCanvas, false);
             break;
         }
         default: {
