@@ -40,12 +40,103 @@ void GameOfLife::run() {
         togglePlayPauseButton,
         nextIterationButton
     ] = _createControlButtons();
+
+    const auto saveListContainer = Container::Vertical({});
+    for (int index = 0; index < _saveList.size(); ++index) {
+        auto saveButton = Button(
+            "Save",
+            [this, index] {
+                _saveList[index].save(_fieldManager.getField());
+            },
+            [this] {
+                ButtonOption option;
+                option.transform = [this](const EntryState& s) {
+                    auto element = text(s.label) | center | border;
+                    if (s.active) {
+                        element |= bold;
+                    }
+                    return element;
+                };
+                option.animated_colors.foreground.Set(Color::White, Color::DeepSkyBlue1);
+                option.animated_colors.background.Set(Color::Default, Color::Default);
+                return option;
+            }()
+        );
+        auto loadButton = Button(
+            "Load",
+            [this, index] {
+                _fieldManager.setField(_saveList[index].load());
+            },
+            [this] {
+                ButtonOption option;
+                option.transform = [this](const EntryState& s) {
+                    auto element = text(s.label) | center | border;
+                    if (s.active) {
+                        element |= bold;
+                    }
+                    return element;
+                };
+                option.animated_colors.foreground.Set(Color::White, Color::DeepSkyBlue1);
+                option.animated_colors.background.Set(Color::Default, Color::Default);
+                return option;
+            }()
+        );
+        auto deleteButton = Button(
+            "Delete",
+            [this, index] {
+                _saveList.erase(_saveList.begin() + index);
+            },
+            [this] {
+                ButtonOption option;
+                option.transform = [this](const EntryState& s) {
+                    auto element = text(s.label) | center | border;
+                    if (s.active) {
+                        element |= bold;
+                    }
+                    return element;
+                };
+                option.animated_colors.foreground.Set(Color::White, Color::RedLight);
+                option.animated_colors.background.Set(Color::Default, Color::Default);
+                return option;
+            }()
+        );
+        const auto saveInfo = Renderer([&, this, index] {
+            const auto [saveDate, saveTime] = _saveList[index].getSaveTime();
+            return vbox({
+                text(format("Name: {}", _saveList[index].getName())),
+                text(format("Time: {}", saveDate)),
+                text(saveTime) | align_right,
+            });
+        });
+        const auto isValid = !_saveList[index].load().empty();
+        const auto container = Container::Vertical({
+            saveInfo | Maybe(&isValid),
+            Container::Horizontal({
+                loadButton | Maybe(&isValid),
+                saveButton,
+                deleteButton | Maybe(&isValid)
+            }) | align_right,
+        });
+        const auto saveItem = Renderer(
+            container,
+            [&, this, index] {
+                return vbox({
+                    text(format("Slot No.{}", index + 1)),
+                    container->Render() | flex,
+                    separator()
+                });
+            }
+        );
+        saveListContainer->Add(saveItem);
+    }
+
     const auto randomizeButton = _createRandomizeButton();
     const auto resetButton = _createResetButton();
     const auto controlRenderer = Renderer(
         Container::Vertical({
             widthInput,
             heightInput,
+            saveListContainer,
             playbackIntervalInput,
             Container::Horizontal({previousIterationButton, togglePlayPauseButton, nextIterationButton}),
             Container::Horizontal({randomizeButton, resetButton})
@@ -62,6 +153,8 @@ void GameOfLife::run() {
                     text("Height: ") | align_right | size(WIDTH, EQUAL, textWidth),
                     heightInput->Render() | flex,
                 }),
+                separator(),
+                saveListContainer->Render() | vscroll_indicator | frame | flex,
                 separator(),
                 hbox({
                     text("Interval: ") | align_right | size(WIDTH, EQUAL, textWidth),
@@ -166,7 +259,7 @@ GameOfLife::_createFieldSizeInputs(string& heightString, string& widthString) {
                               if (const auto width = widthString.empty() ? 0 : stoi(widthString);
                                   width > 0 && width != _fieldSize.x && width <= 25) {
                                   _fieldSize.x = width;
-                                  _fieldManager.setField(_fieldSize);
+                                  _fieldManager.setSize(_fieldSize);
                               } else {
                                   widthString = to_string(_fieldSize.x);
                               }
@@ -184,7 +277,7 @@ GameOfLife::_createFieldSizeInputs(string& heightString, string& widthString) {
                                if (const auto height = heightString.empty() ? 0 : stoi(heightString);
                                    height > 0 && height != _fieldSize.y && height <= 25) {
                                    _fieldSize.y = height;
-                                   _fieldManager.setField(_fieldSize);
+                                   _fieldManager.setSize(_fieldSize);
                                } else {
                                    heightString = to_string(_fieldSize.x);
                                }

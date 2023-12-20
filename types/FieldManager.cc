@@ -129,7 +129,15 @@ void FieldManager::setCell(const Point point, const bool value) {
     } catch (...) {}
 }
 
-void FieldManager::setField(const Point size) { {
+void FieldManager::setField(const Field& field) { {
+        unique_lock lock(_fieldMutex);
+        _field = field;
+    }
+    unique_lock lock(_historyMutex);
+    _history.clear();
+}
+
+void FieldManager::setSize(const Point size) { {
         unique_lock lock(_fieldMutex);
         _field.resize(size.x);
         ranges::for_each(

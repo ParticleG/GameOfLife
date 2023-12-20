@@ -3,6 +3,7 @@
 #include <ftxui/component/component.hpp>
 
 #include <types/FieldManager.h>
+#include <types/FieldSave.h>
 
 namespace types {
     class GameOfLife {
@@ -14,10 +15,12 @@ namespace types {
         void run();
 
     private:
+        int _panelIndex{1};
+        mutable std::shared_mutex _saveListMutex;
+        std::atomic<Point> _mouse;
+        std::vector<FieldSave> _saveList{50};
         FieldManager _fieldManager;
         Point _fieldSize;
-        int _panelIndex{1};
-        std::atomic<Point> _mouse;
 
         ftxui::Component _createCellRenderer();
 

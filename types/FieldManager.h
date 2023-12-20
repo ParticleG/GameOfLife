@@ -29,7 +29,9 @@ namespace types {
 
         void setCell(Point point, bool value);
 
-        void setField(Point size);
+        void setField(const Field& field);
+
+        void setSize(Point size);
 
         void setPlaybackInterval(std::chrono::milliseconds interval = std::chrono::milliseconds(250));
 
