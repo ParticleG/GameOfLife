@@ -16,8 +16,9 @@ using namespace utils;
 
 namespace {
     constexpr auto cell = "██";
-    constexpr auto controlPanelWidth = 25;
-    constexpr auto inputWidth = 8;
+    constexpr auto controlPanelWidth = 35;
+    constexpr auto dataPanelWidth = 25;
+    constexpr auto inputWidth = 12;
 
     const auto controlValueSize = size(WIDTH, EQUAL, inputWidth);
 
@@ -28,7 +29,7 @@ namespace {
 
 GameOfLife::GameOfLife(const int height, const int width)
     : _fieldManager(height, width), _fieldSize(width, height) {
-    console::setConsoleSize(height + 2, width + 2);
+    console::setConsoleSize(height + 2, width + inputWidth * 2 + 6);
 }
 
 void GameOfLife::run() {
@@ -70,14 +71,20 @@ void GameOfLife::run() {
 
     auto randomizeButton = component::makeButton(
         "Randomize",
-        [this] { _fieldManager.randomize(); },
+        [this] {
+            _fieldManager.isPlaying.store(false);
+            _fieldManager.randomize();
+        },
         colorOrangeLight,
         colorOrange
     );
 
     auto resetButton = component::makeButton(
         "Reset",
-        [this] { _fieldManager.reset(); },
+        [this] {
+            _fieldManager.isPlaying.store(false);
+            _fieldManager.reset();
+        },
         colorRedLight,
         colorNegative
     );
@@ -94,44 +101,46 @@ void GameOfLife::run() {
         }),
         [&] {
             const auto aliveCount = _fieldManager.getCellCount();
-            return vbox({
+            return window(
                 text("Control Panel") | hcenter | bold,
-                separator(),
-                hbox({
-                    text("Width: ") | align_right | flex,
-                    widthInput->Render() | controlValueSize,
-                }),
-                hbox({
-                    text("Height: ") | align_right | flex,
-                    heightInput->Render() | controlValueSize,
-                }),
-                separator(),
-                text("") | flex,
-                separator(),
-                hbox({
-                    text("(ms)Interval: ") | align_right | flex,
-                    playbackIntervalInput->Render() | controlValueSize,
-                }),
-                hbox({
-                    previousIterationButton->Render(),
-                    togglePlayPauseButton->Render() | flex,
-                    nextIterationButton->Render(),
-                }),
-                hbox({randomizeButton->Render() | flex, resetButton->Render()}),
-                separator(),
-                hbox({
-                    text("Iteration: ") | align_right | flex,
-                    text(to_string(_fieldManager.getIteration())) | controlValueSize,
-                }),
-                hbox({
-                    text("Alive: ") | align_right | flex,
-                    text(to_string(aliveCount)) | controlValueSize,
-                }),
-                hbox({
-                    text("Dead: ") | align_right | flex,
-                    text(to_string(_fieldSize.x * _fieldSize.y - aliveCount)) | controlValueSize,
-                }),
-            });
+                vbox({
+                    separator(),
+                    hbox({
+                        text("Width: ") | align_right | flex,
+                        widthInput->Render() | controlValueSize,
+                    }),
+                    hbox({
+                        text("Height: ") | align_right | flex,
+                        heightInput->Render() | controlValueSize,
+                    }),
+                    separator(),
+                    text("") | flex,
+                    separator(),
+                    hbox({
+                        text("Interval(ms): ") | align_right | flex,
+                        playbackIntervalInput->Render() | controlValueSize,
+                    }),
+                    hbox({
+                        previousIterationButton->Render(),
+                        togglePlayPauseButton->Render() | flex,
+                        nextIterationButton->Render(),
+                    }),
+                    hbox({randomizeButton->Render() | flex, resetButton->Render()}),
+                    separator(),
+                    hbox({
+                        text("Iteration: ") | align_right | flex,
+                        text(to_string(_fieldManager.getIteration())) | controlValueSize,
+                    }),
+                    hbox({
+                        text("Alive: ") | align_right | flex,
+                        text(to_string(aliveCount)) | controlValueSize,
+                    }),
+                    hbox({
+                        text("Dead: ") | align_right | flex,
+                        text(to_string(_fieldSize.x * _fieldSize.y - aliveCount)) | controlValueSize,
+                    }),
+                })
+            );
         }
     );
 
@@ -230,11 +239,10 @@ void GameOfLife::run() {
     const auto dataRenderer = Renderer(
         saveListContainer,
         [&] {
-            return vbox({
+            return window(
                 text("Data Panel") | hcenter | bold,
-                separator(),
-                saveListContainer->Render() | vscroll_indicator | frame | flex,
-            });
+                saveListContainer->Render() | vscroll_indicator | frame | flex
+            );
         }
     );
 
@@ -247,9 +255,9 @@ void GameOfLife::run() {
     }).detach();
     screen.Loop(Container::Horizontal(
         {
-            controlRenderer | size(WIDTH, EQUAL, controlPanelWidth) | border,
-            cellEventHandler | flex | border,
-            dataRenderer | size(WIDTH, EQUAL, controlPanelWidth) | border
+            controlRenderer | size(WIDTH, EQUAL, controlPanelWidth),
+            cellEventHandler | flex_grow | border,
+            dataRenderer | size(WIDTH, EQUAL, dataPanelWidth)
         },
         &_panelIndex
     ));
@@ -297,8 +305,10 @@ Component GameOfLife::_createCellRenderer() {
         return canvas(move(c));
     }) | CatchEvent([this](Event event) {
         if (event == Event::ArrowRight) {
+            _fieldManager.isPlaying.store(false);
             _fieldManager.nextIteration();
         } else if (event == Event::ArrowLeft) {
+            _fieldManager.isPlaying.store(false);
             _fieldManager.previousIteration();
         } else if (event.is_character()) {
             _handleNormalKeysEvent(event.character());
@@ -378,10 +388,12 @@ Component GameOfLife::_createPlaybackIntervalInput(string& playbackIntervalStrin
 void GameOfLife::_handleNormalKeysEvent(const string& keys) {
     switch (keys[0]) {
         case 'c': {
+            _fieldManager.isPlaying.store(false);
             _fieldManager.reset();
             break;
         }
         case 'r': {
+            _fieldManager.isPlaying.store(false);
             _fieldManager.randomize();
             break;
         }
@@ -397,7 +409,7 @@ void GameOfLife::_handleNormalKeysEvent(const string& keys) {
 void GameOfLife::_handleMouseEvent(const Mouse& mouseEvent) {
     const auto& [button, motion, shift, meta, control, x, y] = mouseEvent;
     // Minus 1 for the border.
-    const auto mouseInCanvas = Point{(x - controlPanelWidth - 3) / 2, y - 1};
+    const auto mouseInCanvas = Point{(x - controlPanelWidth - 1) / 2, y - 1};
     if (mouseInCanvas.x >= 0 && mouseInCanvas.x < _fieldSize.x
         && mouseInCanvas.y >= 0 && mouseInCanvas.y < _fieldSize.y) {
         _panelIndex = 1;
