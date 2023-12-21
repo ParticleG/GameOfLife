@@ -2,10 +2,10 @@
 
 #include <ftxui/component/screen_interactive.hpp>
 
-#include <helpers/ButtonHelper.h>
 #include <helpers/ColorHelper.h>
 #include <types/common.h>
 #include <types/GameOfLife.h>
+#include <utils/component.h>
 #include <utils/console.h>
 
 using namespace ftxui;
@@ -41,57 +41,41 @@ void GameOfLife::run() {
         widthInput
     ] = _createFieldSizeInputs(heightString, widthString);
     const auto playbackIntervalInput = _createPlaybackIntervalInput(playbackIntervalString);
-    const auto [
-        previousIterationButton,
-        togglePlayPauseButton,
-        nextIterationButton
-    ] = _createControlButtons();
 
-    const auto saveListContainer = Container::Vertical({});
-    for (int index = 0; index < _saveList.size(); ++index) {
-        const auto [
-            loadButton,
-            saveButton,
-            deleteButton
-        ] = _createSaveButtons(index);
-        const auto saveInfo = Renderer([&, this, index] {
-            const auto [saveDate, saveTime] = _saveList[index].getSaveTime();
-            return vbox({
-                text(format("Name: {}", _saveList[index].getName())),
-                text(format("Time: {}", saveDate)),
-                text(saveTime) | align_right,
-            });
-        });
-        const auto isValid = !_saveList[index].load().empty();
-        const auto container = Container::Vertical({
-            saveInfo | Maybe(&isValid),
-            Container::Horizontal({
-                loadButton | Maybe(&isValid),
-                saveButton,
-                deleteButton | Maybe(&isValid)
-            }) | align_right,
-        });
-        const auto saveItem = Renderer(
-            container,
-            [&, this, index] {
-                return vbox({
-                    text(format("Slot No.{}", index + 1)),
-                    container->Render() | flex,
-                    separator()
-                });
-            }
-        );
-        saveListContainer->Add(saveItem);
-    }
+    auto previousIterationButton = component::makeButton(
+        "<-",
+        [this] {
+            _fieldManager.isPlaying.store(false);
+            _fieldManager.previousIteration();
+        },
+        colorLightBlue
+    );
 
-    auto randomizeButton = ButtonHelper(
+    auto togglePlayPauseButton = component::makeButton(
+        [this] { return _fieldManager.isPlaying.load() ? "Pause" : "Start"; },
+        [this] {
+            _fieldManager.isPlaying.store(!_fieldManager.isPlaying.load());
+        },
+        colorGreen
+    );
+
+    auto nextIterationButton = component::makeButton(
+        "->",
+        [this] {
+            _fieldManager.isPlaying.store(false);
+            _fieldManager.nextIteration();
+        },
+        colorLightBlue
+    );
+
+    auto randomizeButton = component::makeButton(
         "Randomize",
         [this] { _fieldManager.randomize(); },
         colorOrangeLight,
         colorOrange
     );
 
-    auto resetButton = ButtonHelper(
+    auto resetButton = component::makeButton(
         "Reset",
         [this] { _fieldManager.reset(); },
         colorRedLight,
@@ -102,10 +86,11 @@ void GameOfLife::run() {
         Container::Vertical({
             widthInput,
             heightInput,
-            saveListContainer,
             playbackIntervalInput,
-            Container::Horizontal({previousIterationButton, togglePlayPauseButton, nextIterationButton}),
-            Container::Horizontal({randomizeButton.component(), resetButton.component()})
+            Container::Horizontal({
+                previousIterationButton, togglePlayPauseButton, nextIterationButton
+            }),
+            Container::Horizontal({randomizeButton, resetButton})
         }),
         [&] {
             const auto aliveCount = _fieldManager.getCellCount();
@@ -121,7 +106,7 @@ void GameOfLife::run() {
                     heightInput->Render() | controlValueSize,
                 }),
                 separator(),
-                saveListContainer->Render() | vscroll_indicator | frame | flex,
+                text("") | flex,
                 separator(),
                 hbox({
                     text("(ms)Interval: ") | align_right | flex,
@@ -132,7 +117,7 @@ void GameOfLife::run() {
                     togglePlayPauseButton->Render() | flex,
                     nextIterationButton->Render(),
                 }),
-                hbox({randomizeButton.render() | flex, resetButton.render()}),
+                hbox({randomizeButton->Render() | flex, resetButton->Render()}),
                 separator(),
                 hbox({
                     text("Iteration: ") | align_right | flex,
@@ -152,12 +137,103 @@ void GameOfLife::run() {
 
     const auto cellEventHandler = _createCellRenderer();
 
-    const auto pageRenderer = Renderer(
-        Container::Horizontal({controlRenderer, cellEventHandler}, &_panelIndex),
+    /// Use focusIndex for scroll issue, See: {@link https://github.com/ArthurSonzogni/FTXUI/issues/125}
+    int focusIndex = 0, itemIndex = 0;
+    auto saveListContainer = Container::Vertical({}, &itemIndex);
+    for (int index = 0; index < _saveList.size(); ++index) {
+        auto loadButton = component::makeButton(
+            "Load",
+            [&, index] {
+                if (const auto savedField = _saveList[index].load();
+                    !savedField.empty()) {
+                    _fieldSize.x = static_cast<int>(savedField.size());
+                    _fieldSize.y = static_cast<int>(savedField[0].size());
+                    heightString = to_string(_fieldSize.x);
+                    widthString = to_string(_fieldSize.y);
+                    _fieldManager.setField(savedField);
+                }
+            },
+            colorLightGreen
+        );
+        auto saveButton = component::makeButton(
+            "Save",
+            [&, index] {
+                _saveList[index].save(_fieldManager.getField());
+            },
+            colorLightBlue
+        );
+        auto deleteButton = component::makeButton(
+            "Delete",
+            [&, index] {
+                _saveList[index].reset();
+            },
+            colorRedLight,
+            colorNegative
+        );
+        const auto saveItem = Renderer([&, index] {
+                const auto isValid = !_saveList[index].load().empty();
+                const auto [saveDate, saveTime] = _saveList[index].getSaveTime();
+                Element element;
+                if (isValid) {
+                    element = vbox({
+                        text(format("Slot No.{}", index + 1)),
+                        vbox({
+                            text(format("Name: {}", _saveList[index].getName())),
+                            text(format("Time: {}", saveDate)),
+                            text(format("      {}", saveTime)),
+                        }),
+                    });
+                } else {
+                    element = vbox({
+                        text(format("Slot No.{}", index + 1)),
+                    });
+                }
+
+                if (index == focusIndex) {
+                    element |= focus;
+                }
+                return element;
+            }
+        );
+        saveListContainer->Add(saveItem);
+        saveListContainer->Add(
+            Container::Horizontal({
+                loadButton,
+                saveButton,
+                deleteButton
+            }) | CatchEvent([&](Event event) {
+                if (event.is_mouse()) {
+                    if (event.mouse().button == Mouse::Left &&
+                        event.mouse().motion == Mouse::Released) {
+                        // Move focus to the container of the buttons.
+                        itemIndex = index * 2;
+                        return true;
+                    }
+                }
+                return false;
+            })
+        );
+    }
+    saveListContainer |= CatchEvent([&](Event event) {
+        if (event.is_mouse()) {
+            if (event.mouse().button == Mouse::WheelUp) {
+                focusIndex = max(0, focusIndex - 1);
+                return true;
+            }
+            if (event.mouse().button == Mouse::WheelDown) {
+                focusIndex = min(static_cast<int>(_saveList.size()) - 1, focusIndex + 1);
+                return true;
+            }
+        }
+        return false;
+    });
+    const auto dataRenderer = Renderer(
+        saveListContainer,
         [&] {
-            return hflow({
-                controlRenderer->Render() | size(WIDTH, EQUAL, controlPanelWidth) | flex | border,
-                cellEventHandler->Render() | border
+            return vbox({
+                text("Data Panel") | hcenter | bold,
+                separator(),
+                saveListContainer->Render() | vscroll_indicator | frame | flex,
             });
         }
     );
@@ -169,7 +245,14 @@ void GameOfLife::run() {
             screen.PostEvent(Event::Custom);
         }
     }).detach();
-    screen.Loop(pageRenderer);
+    screen.Loop(Container::Horizontal(
+        {
+            controlRenderer | size(WIDTH, EQUAL, controlPanelWidth) | border,
+            cellEventHandler | flex | border,
+            dataRenderer | size(WIDTH, EQUAL, controlPanelWidth) | border
+        },
+        &_panelIndex
+    ));
 }
 
 Component GameOfLife::_createCellRenderer() {
@@ -222,7 +305,7 @@ Component GameOfLife::_createCellRenderer() {
         } else if (event.is_mouse()) {
             _handleMouseEvent(event.mouse());
         }
-        return true;
+        return false;
     });
 }
 
@@ -270,69 +353,6 @@ GameOfLife::_createFieldSizeInputs(string& heightString, string& widthString) {
     return {move(heightInput), move(widthInput)};
 }
 
-tuple<Component, Component, Component> GameOfLife::_createControlButtons() {
-    auto previousIterationButton = Button(
-        "<-",
-        [this] {
-            _fieldManager.isPlaying.store(false);
-            _fieldManager.previousIteration();
-        },
-        [this] {
-            ButtonOption option;
-            option.transform = [this](const EntryState& s) {
-                auto element = text(s.label) | center | border;
-                if (s.active) {
-                    element |= bold;
-                }
-                return element;
-            };
-            option.animated_colors.foreground.Set(Color::White, Color::DeepSkyBlue1);
-            option.animated_colors.background.Set(Color::Default, Color::Default);
-            return option;
-        }()
-    );
-    auto togglePlayPauseButton = Button(
-        "Start",
-        [this] {
-            _fieldManager.isPlaying.store(!_fieldManager.isPlaying.load());
-        },
-        [this] {
-            ButtonOption option;
-            option.transform = [this](const EntryState& s) {
-                auto element = text(_fieldManager.isPlaying.load() ? "Pause" : "Start") | center | border;
-                if (s.active) {
-                    element |= bold;
-                }
-                return element;
-            };
-            option.animated_colors.foreground.Set(Color::White, Color::LightGreen);
-            option.animated_colors.background.Set(Color::Default, Color::Default);
-            return option;
-        }()
-    );
-    auto nextIterationButton = Button(
-        "->",
-        [this] {
-            _fieldManager.isPlaying.store(false);
-            _fieldManager.nextIteration();
-        },
-        [this] {
-            ButtonOption option;
-            option.transform = [this](const EntryState& s) {
-                auto element = text(s.label) | center | border;
-                if (s.active) {
-                    element |= bold;
-                }
-                return element;
-            };
-            option.animated_colors.foreground.Set(Color::White, Color::DeepSkyBlue1);
-            option.animated_colors.background.Set(Color::Default, Color::Default);
-            return option;
-        }()
-    );
-    return {move(previousIterationButton), move(togglePlayPauseButton), move(nextIterationButton)};
-}
-
 Component GameOfLife::_createPlaybackIntervalInput(string& playbackIntervalString) {
     using namespace ftxui;
 
@@ -353,67 +373,6 @@ Component GameOfLife::_createPlaybackIntervalInput(string& playbackIntervalStrin
                }
                return false;
            });
-}
-
-tuple<Component, Component, Component> GameOfLife::_createSaveButtons(const int index) {
-    auto loadButton = Button(
-        "Load",
-        [this, index] {
-            _fieldManager.setField(_saveList[index].load());
-        },
-        [this] {
-            ButtonOption option;
-            option.transform = [this](const EntryState& s) {
-                auto element = text(s.label) | center | border;
-                if (s.active) {
-                    element |= bold;
-                }
-                return element;
-            };
-            option.animated_colors.foreground.Set(Color::White, Color::DeepSkyBlue1);
-            option.animated_colors.background.Set(Color::Default, Color::Default);
-            return option;
-        }()
-    );
-    auto saveButton = Button(
-        "Save",
-        [this, index] {
-            _saveList[index].save(_fieldManager.getField());
-        },
-        [this] {
-            ButtonOption option;
-            option.transform = [this](const EntryState& s) {
-                auto element = text(s.label) | center | border;
-                if (s.active) {
-                    element |= bold;
-                }
-                return element;
-            };
-            option.animated_colors.foreground.Set(Color::White, Color::DeepSkyBlue1);
-            option.animated_colors.background.Set(Color::Default, Color::Default);
-            return option;
-        }()
-    );
-    auto deleteButton = Button(
-        "Delete",
-        [this, index] {
-            _saveList.erase(_saveList.begin() + index);
-        },
-        [this] {
-            ButtonOption option;
-            option.transform = [this](const EntryState& s) {
-                auto element = text(s.label) | center | border;
-                if (s.active) {
-                    element |= bold;
-                }
-                return element;
-            };
-            option.animated_colors.foreground.Set(Color::White, Color::RedLight);
-            option.animated_colors.background.Set(Color::Default, Color::Default);
-            return option;
-        }()
-    );
-    return {move(loadButton), move(saveButton), move(deleteButton)};
 }
 
 void GameOfLife::_handleNormalKeysEvent(const string& keys) {

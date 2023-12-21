@@ -35,8 +35,9 @@ target_link_libraries(${PROJECT_NAME}
 
 target_include_directories(${PROJECT_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
+aux_source_directory(${CMAKE_CURRENT_SOURCE_DIR}/components/ COMPONENTS)
 aux_source_directory(${CMAKE_CURRENT_SOURCE_DIR}/helpers/ HELPERS)
 aux_source_directory(${CMAKE_CURRENT_SOURCE_DIR}/types/ TYPES)
 aux_source_directory(${CMAKE_CURRENT_SOURCE_DIR}/utils/ UTILS)
 
-target_sources(${PROJECT_NAME} PRIVATE ${HELPERS} ${TYPES} ${UTILS})
+target_sources(${PROJECT_NAME} PRIVATE ${COMPONENTS} ${HELPERS} ${TYPES} ${UTILS})

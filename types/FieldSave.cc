@@ -18,15 +18,19 @@ tuple<string, string> FieldSave::getSaveTime() const {
     return {
         format("{:%Y/%m/%d}", _saveTime),
         format(
-            "{:%H:%M:%S}.{:03d}",
-            _saveTime,
-            chrono::duration_cast<chrono::milliseconds>(_saveTime.time_since_epoch()).count() % 1000
+            "{:%H:%M:%S}",
+            _saveTime
         )
     };
 }
 
 Field FieldSave::load() const {
     return _field;
+}
+
+void FieldSave::reset() {
+    _field = Field();
+    _name.clear();
 }
 
 void FieldSave::save(const Field& field) {

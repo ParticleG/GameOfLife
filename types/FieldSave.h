@@ -21,6 +21,8 @@ namespace types {
 
         [[nodiscard]] Field load() const;
 
+        void reset();
+
         void save(const Field& field);
 
     private:

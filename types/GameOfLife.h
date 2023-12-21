@@ -15,7 +15,7 @@ namespace types {
         void run();
 
     private:
-        int _panelIndex{1};
+        int _panelIndex{2};
         mutable std::shared_mutex _saveListMutex;
         std::atomic<Point> _mouse;
         std::vector<FieldSave> _saveList{50};
@@ -29,11 +29,7 @@ namespace types {
             std::string& widthString
         );
 
-        std::tuple<ftxui::Component, ftxui::Component, ftxui::Component> _createControlButtons();
-
         ftxui::Component _createPlaybackIntervalInput(std::string& playbackIntervalString);
-
-        std::tuple<ftxui::Component, ftxui::Component, ftxui::Component> _createSaveButtons(int index);
 
         void _handleNormalKeysEvent(const std::string& keys);
 
