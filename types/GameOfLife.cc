@@ -131,9 +131,9 @@ void GameOfLife::run() {
                     }),
                     separator(),
                     hbox({
-                        aliveContainer->Render() | vscroll_indicator | frame,
+                        aliveContainer->Render() | flex,
                         separator(),
-                        deadContainer->Render() | vscroll_indicator | frame,
+                        deadContainer->Render() | flex,
                     }) | border | flex,
                     separator(),
                     hbox({
