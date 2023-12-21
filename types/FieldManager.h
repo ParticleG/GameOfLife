@@ -15,6 +15,8 @@ namespace types {
 
         ~FieldManager() = default;
 
+        [[nodiscard]] uint64_t getCellCount() const;
+
         [[nodiscard]] Field getField() const;
 
         [[nodiscard]] uint64_t getIteration() const;

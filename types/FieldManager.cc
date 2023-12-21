@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <numeric>
 #include <random>
 
 #include <ftxui/component/component.hpp>
@@ -19,6 +20,25 @@ FieldManager::FieldManager(const int height, const int width)
         }
     );
     _playbackThread();
+}
+
+uint64_t FieldManager::getCellCount() const {
+    shared_lock lock(_fieldMutex);
+    return accumulate(
+        _field.begin(),
+        _field.end(),
+        0,
+        [](const auto& sumColumn, const auto& sub) {
+            return sumColumn + accumulate(
+                       sub.begin(),
+                       sub.end(),
+                       0,
+                       [](const auto& sumCell, const auto& cell) {
+                           return sumCell + cell;
+                       }
+                   );
+        }
+    );
 }
 
 Field FieldManager::getField() const {
@@ -151,7 +171,7 @@ void FieldManager::setSize(const Point size) { {
     _history.clear();
 }
 
-void FieldManager::setPlaybackInterval(const std::chrono::milliseconds interval) {
+void FieldManager::setPlaybackInterval(const chrono::milliseconds interval) {
     playbackInterval.store(interval);
 }
 

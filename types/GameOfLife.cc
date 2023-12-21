@@ -13,6 +13,10 @@ using namespace utils;
 
 namespace {
     constexpr auto cell = "██";
+    constexpr auto controlPanelWidth = 25;
+    constexpr auto inputWidth = 8;
+
+    const auto controlValueSize = size(WIDTH, EQUAL, inputWidth);
 
     void drawCell(Canvas& c, const Point& mouse, const Color color) {
         c.DrawText(4 * mouse.x, 4 * mouse.y, cell, color);
@@ -25,7 +29,6 @@ GameOfLife::GameOfLife(const int height, const int width)
 }
 
 void GameOfLife::run() {
-    constexpr auto textWidth = 16;
     auto heightString = to_string(_fieldSize.y),
             playbackIntervalString = to_string(_fieldManager.playbackInterval.load().count()),
             widthString = to_string(_fieldSize.x);
@@ -90,30 +93,44 @@ void GameOfLife::run() {
             Container::Horizontal({randomizeButton, resetButton})
         }),
         [&] {
+            const auto aliveCount = _fieldManager.getCellCount();
             return vbox({
                 text("Control Panel") | hcenter | bold,
                 separator(),
                 hbox({
-                    text("Width: ") | align_right | size(WIDTH, EQUAL, textWidth),
-                    widthInput->Render() | flex,
+                    text("Width: ") | align_right | flex,
+                    widthInput->Render() | controlValueSize,
                 }),
                 hbox({
-                    text("Height: ") | align_right | size(WIDTH, EQUAL, textWidth),
-                    heightInput->Render() | flex,
+                    text("Height: ") | align_right | flex,
+                    heightInput->Render() | controlValueSize,
                 }),
                 separator(),
                 saveListContainer->Render() | vscroll_indicator | frame | flex,
                 separator(),
                 hbox({
-                    text("Interval: ") | align_right | size(WIDTH, EQUAL, textWidth),
-                    playbackIntervalInput->Render() | flex,
+                    text("(ms)Interval: ") | align_right | flex,
+                    playbackIntervalInput->Render() | controlValueSize,
                 }),
                 hbox({
                     previousIterationButton->Render(),
                     togglePlayPauseButton->Render() | flex,
                     nextIterationButton->Render(),
                 }),
-                hbox({randomizeButton->Render() | flex, resetButton->Render()})
+                hbox({randomizeButton->Render() | flex, resetButton->Render()}),
+                separator(),
+                hbox({
+                    text("Iteration: ") | align_right | flex,
+                    text(to_string(_fieldManager.getIteration())) | controlValueSize,
+                }),
+                hbox({
+                    text("Alive: ") | align_right | flex,
+                    text(to_string(aliveCount)) | controlValueSize,
+                }),
+                hbox({
+                    text("Dead: ") | align_right | flex,
+                    text(to_string(_fieldSize.x * _fieldSize.y - aliveCount)) | controlValueSize,
+                }),
             });
         }
     );
@@ -124,7 +141,7 @@ void GameOfLife::run() {
         Container::Horizontal({controlRenderer, cellEventHandler}, &_panelIndex),
         [&] {
             return hflow({
-                controlRenderer->Render() | size(WIDTH, EQUAL, 25) | flex | border,
+                controlRenderer->Render() | size(WIDTH, EQUAL, controlPanelWidth) | flex | border,
                 cellEventHandler->Render() | border
             });
         }
@@ -205,7 +222,7 @@ GameOfLife::_createFieldSizeInputs(string& heightString, string& widthString) {
                       | CatchEvent([&](const Event& event) {
                           if (event == Event::Return) {
                               if (const auto width = widthString.empty() ? 0 : stoi(widthString);
-                                  width > 0 && width != _fieldSize.x && width <= 25) {
+                                  width > 0 && width != _fieldSize.x && width <= 28) {
                                   _fieldSize.x = width;
                                   _fieldManager.setSize(_fieldSize);
                               } else {
@@ -223,7 +240,7 @@ GameOfLife::_createFieldSizeInputs(string& heightString, string& widthString) {
                        | CatchEvent([&](const Event& event) {
                            if (event == Event::Return) {
                                if (const auto height = heightString.empty() ? 0 : stoi(heightString);
-                                   height > 0 && height != _fieldSize.y && height <= 25) {
+                                   height > 0 && height != _fieldSize.y && height <= 28) {
                                    _fieldSize.y = height;
                                    _fieldManager.setSize(_fieldSize);
                                } else {
@@ -450,7 +467,7 @@ void GameOfLife::_handleNormalKeysEvent(const string& keys) {
 void GameOfLife::_handleMouseEvent(const Mouse& mouseEvent) {
     const auto& [button, motion, shift, meta, control, x, y] = mouseEvent;
     // Minus 1 for the border.
-    const auto mouseInCanvas = Point{(x - 23) / 2, y - 1};
+    const auto mouseInCanvas = Point{(x - controlPanelWidth - 3) / 2, y - 1};
     if (mouseInCanvas.x >= 0 && mouseInCanvas.x < _fieldSize.x
         && mouseInCanvas.y >= 0 && mouseInCanvas.y < _fieldSize.y) {
         _panelIndex = 1;

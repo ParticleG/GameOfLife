@@ -4,7 +4,7 @@ using namespace std;
 using namespace types;
 
 int main() {
-    GameOfLife gameOfLife(25, 25);
+    GameOfLife gameOfLife(28, 28);
 
     gameOfLife.run();
 
