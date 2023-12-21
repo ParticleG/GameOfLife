@@ -2,11 +2,14 @@
 
 #include <ftxui/component/screen_interactive.hpp>
 
+#include <helpers/ButtonHelper.h>
+#include <helpers/ColorHelper.h>
 #include <types/common.h>
 #include <types/GameOfLife.h>
 #include <utils/console.h>
 
 using namespace ftxui;
+using namespace helpers;
 using namespace std;
 using namespace types;
 using namespace utils;
@@ -81,7 +84,10 @@ void GameOfLife::run() {
         saveListContainer->Add(saveItem);
     }
 
-    const auto randomizeButton = _createRandomizeButton();
+    auto randomizeButton = ButtonHelper("Randomize", [this] { _fieldManager.randomize(); });
+    randomizeButton.setNormalColor(colorOrange);
+    randomizeButton.setFocusedColor(colorOrangeLight);
+
     const auto resetButton = _createResetButton();
     const auto controlRenderer = Renderer(
         Container::Vertical({
@@ -90,7 +96,7 @@ void GameOfLife::run() {
             saveListContainer,
             playbackIntervalInput,
             Container::Horizontal({previousIterationButton, togglePlayPauseButton, nextIterationButton}),
-            Container::Horizontal({randomizeButton, resetButton})
+            Container::Horizontal({randomizeButton.component(), resetButton})
         }),
         [&] {
             const auto aliveCount = _fieldManager.getCellCount();
@@ -117,7 +123,7 @@ void GameOfLife::run() {
                     togglePlayPauseButton->Render() | flex,
                     nextIterationButton->Render(),
                 }),
-                hbox({randomizeButton->Render() | flex, resetButton->Render()}),
+                hbox({randomizeButton.render() | flex, resetButton->Render()}),
                 separator(),
                 hbox({
                     text("Iteration: ") | align_right | flex,
