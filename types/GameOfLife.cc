@@ -29,6 +29,14 @@ namespace {
 
 GameOfLife::GameOfLife(const int height, const int width)
     : _fieldManager(height, width), _fieldSize(width, height) {
+    _aliveConfig[3] = true;
+    _deadConfig[0] = true;
+    _deadConfig[1] = true;
+    _deadConfig[4] = true;
+    _deadConfig[5] = true;
+    _deadConfig[6] = true;
+    _deadConfig[7] = true;
+    _deadConfig[8] = true;
     console::setConsoleSize(height + 2, width + inputWidth * 2 + 6);
 }
 
@@ -42,6 +50,13 @@ void GameOfLife::run() {
         widthInput
     ] = _createFieldSizeInputs(heightString, widthString);
     const auto playbackIntervalInput = _createPlaybackIntervalInput(playbackIntervalString);
+
+    auto aliveContainer = Container::Vertical({});
+    auto deadContainer = Container::Vertical({});
+    for (int index = 0; index <= 8; ++index) {
+        aliveContainer->Add(Checkbox(format("{} cells", index), &_aliveConfig[index]));
+        deadContainer->Add(Checkbox(format("{} cells", index), &_deadConfig[index]));
+    }
 
     auto previousIterationButton = component::makeButton(
         "<-",
@@ -93,6 +108,7 @@ void GameOfLife::run() {
         Container::Vertical({
             widthInput,
             heightInput,
+            Container::Horizontal({aliveContainer, deadContainer}),
             playbackIntervalInput,
             Container::Horizontal({
                 previousIterationButton, togglePlayPauseButton, nextIterationButton
@@ -114,7 +130,11 @@ void GameOfLife::run() {
                         heightInput->Render() | controlValueSize,
                     }),
                     separator(),
-                    text("") | flex,
+                    hbox({
+                        aliveContainer->Render() | vscroll_indicator | frame,
+                        separator(),
+                        deadContainer->Render() | vscroll_indicator | frame,
+                    }) | border | flex,
                     separator(),
                     hbox({
                         text("Interval(ms): ") | align_right | flex,

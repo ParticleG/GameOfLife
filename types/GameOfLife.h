@@ -1,5 +1,7 @@
 #pragma once
 
+#include <array>
+
 #include <ftxui/component/component.hpp>
 
 #include <types/FieldManager.h>
@@ -18,6 +20,7 @@ namespace types {
         int _panelIndex{2};
         mutable std::shared_mutex _saveListMutex;
         std::atomic<Point> _mouse;
+        std::array<bool, 9> _aliveConfig{}, _deadConfig{};
         std::vector<FieldSave> _saveList{50};
         FieldManager _fieldManager;
         Point _fieldSize;
