@@ -4,14 +4,22 @@ using namespace ftxui;
 using namespace helpers;
 using namespace std;
 
-ButtonHelper::ButtonHelper(function<string()> dynamicLabel, function<void()> callback)
-    : _dynamicLabel(move(dynamicLabel)), _callback(move(callback)) {
-    _button = _createButton();
+ButtonHelper::ButtonHelper(
+    function<string()> dynamicLabel,
+    function<void()> callback,
+    const Color focusColor,
+    const Color normalColor
+): _dynamicLabel(move(dynamicLabel)), _callback(move(callback)) {
+    _button = _createButton(focusColor, normalColor);
 }
 
-ButtonHelper::ButtonHelper(string label, function<void()> callback)
-    : _callback(move(callback)), _staticLabel(move(label)) {
-    _button = _createButton();
+ButtonHelper::ButtonHelper(
+    string label,
+    function<void()> callback,
+    const Color focusColor,
+    const Color normalColor
+): _callback(move(callback)), _staticLabel(move(label)) {
+    _button = _createButton(focusColor, normalColor);
 }
 
 Component& ButtonHelper::component() {
@@ -22,21 +30,11 @@ Element ButtonHelper::render() const {
     return _button->Render();
 }
 
-void ButtonHelper::setFocusedColor(const Color color) {
-    _focusedColor = color;
-    _button = _createButton();
-}
-
-void ButtonHelper::setNormalColor(const Color color) {
-    _normalColor = color;
-    _button = _createButton();
-}
-
-Component ButtonHelper::_createButton() const {
+Component ButtonHelper::_createButton(const Color focusColor, const Color normalColor) const {
     return Button(
         _staticLabel,
         _callback,
-        [this] {
+        [this, focusColor, normalColor] {
             ButtonOption option;
             option.transform = [this](const EntryState& s) {
                 auto element = text(_staticLabel.empty() ? _dynamicLabel() : s.label) | center | border;
@@ -45,7 +43,7 @@ Component ButtonHelper::_createButton() const {
                 }
                 return element;
             };
-            option.animated_colors.foreground.Set(_normalColor, _focusedColor);
+            option.animated_colors.foreground.Set(normalColor, focusColor);
             option.animated_colors.background.Set(Color::Default, Color::Default);
             return option;
         }()

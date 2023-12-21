@@ -9,29 +9,31 @@ namespace helpers {
     public:
         ButtonHelper(
             std::function<std::string()> dynamicLabel,
-            std::function<void()> callback
+            std::function<void()> callback,
+            ftxui::Color focusColor = ftxui::Color::Default,
+            ftxui::Color normalColor = ftxui::Color::Default
         );
 
         ButtonHelper(
             std::string label,
-            std::function<void()> callback
+            std::function<void()> callback,
+            ftxui::Color focusColor = ftxui::Color::Default,
+            ftxui::Color normalColor = ftxui::Color::Default
         );
 
         [[nodiscard]] ftxui::Component& component();
 
         [[nodiscard]] ftxui::Element render() const;
 
-        void setFocusedColor(ftxui::Color color);
-
-        void setNormalColor(ftxui::Color color);
-
     private:
-        ftxui::Color _focusedColor, _normalColor;
         ftxui::Component _button;
         std::function<std::string()> _dynamicLabel;
         std::function<void()> _callback;
         std::string _staticLabel;
 
-        [[nodiscard]] ftxui::Component _createButton() const;
+        [[nodiscard]] ftxui::Component _createButton(
+            ftxui::Color focusColor,
+            ftxui::Color normalColor
+        ) const;
     };
 }

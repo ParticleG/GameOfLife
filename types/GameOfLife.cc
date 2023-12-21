@@ -84,11 +84,20 @@ void GameOfLife::run() {
         saveListContainer->Add(saveItem);
     }
 
-    auto randomizeButton = ButtonHelper("Randomize", [this] { _fieldManager.randomize(); });
-    randomizeButton.setNormalColor(colorOrange);
-    randomizeButton.setFocusedColor(colorOrangeLight);
+    auto randomizeButton = ButtonHelper(
+        "Randomize",
+        [this] { _fieldManager.randomize(); },
+        colorOrangeLight,
+        colorOrange
+    );
 
-    const auto resetButton = _createResetButton();
+    auto resetButton = ButtonHelper(
+        "Reset",
+        [this] { _fieldManager.reset(); },
+        colorRedLight,
+        colorNegative
+    );
+
     const auto controlRenderer = Renderer(
         Container::Vertical({
             widthInput,
@@ -96,7 +105,7 @@ void GameOfLife::run() {
             saveListContainer,
             playbackIntervalInput,
             Container::Horizontal({previousIterationButton, togglePlayPauseButton, nextIterationButton}),
-            Container::Horizontal({randomizeButton.component(), resetButton})
+            Container::Horizontal({randomizeButton.component(), resetButton.component()})
         }),
         [&] {
             const auto aliveCount = _fieldManager.getCellCount();
@@ -123,7 +132,7 @@ void GameOfLife::run() {
                     togglePlayPauseButton->Render() | flex,
                     nextIterationButton->Render(),
                 }),
-                hbox({randomizeButton.render() | flex, resetButton->Render()}),
+                hbox({randomizeButton.render() | flex, resetButton.render()}),
                 separator(),
                 hbox({
                     text("Iteration: ") | align_right | flex,
@@ -344,50 +353,6 @@ Component GameOfLife::_createPlaybackIntervalInput(string& playbackIntervalStrin
                }
                return false;
            });
-}
-
-Component GameOfLife::_createRandomizeButton() {
-    return Button(
-        "Randomize",
-        [this] {
-            _fieldManager.randomize();
-        },
-        [this] {
-            ButtonOption option;
-            option.transform = [this](const EntryState& s) {
-                auto element = text(s.label) | center | border;
-                if (s.active) {
-                    element |= bold;
-                }
-                return element;
-            };
-            option.animated_colors.foreground.Set(Color::White, Color::Gold1);
-            option.animated_colors.background.Set(Color::Default, Color::Default);
-            return option;
-        }()
-    );
-}
-
-Component GameOfLife::_createResetButton() {
-    return Button(
-        "Reset",
-        [this] {
-            _fieldManager.reset();
-        },
-        [this] {
-            ButtonOption option;
-            option.transform = [this](const EntryState& s) {
-                auto element = text(s.label) | center | border;
-                if (s.active) {
-                    element |= bold;
-                }
-                return element;
-            };
-            option.animated_colors.foreground.Set(Color::White, Color::RedLight);
-            option.animated_colors.background.Set(Color::Default, Color::Default);
-            return option;
-        }()
-    );
 }
 
 tuple<Component, Component, Component> GameOfLife::_createSaveButtons(const int index) {
