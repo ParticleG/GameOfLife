@@ -33,7 +33,7 @@ GameOfLife::GameOfLife(const int height, const int width)
     const auto [aliveRule, deadRule] = _fieldManager.getRules();
     _aliveRule = aliveRule;
     _deadRule = deadRule;
-    console::setConsoleSize(height + 2, width + inputWidth * 2 + 6);
+    console::setConsoleSize(height + 2, width + controlPanelWidth + dataPanelWidth + 6);
 }
 
 void GameOfLife::run() {
@@ -62,7 +62,7 @@ void GameOfLife::run() {
             _fieldManager.setDeadRule(index, _deadRule[index]);
         };
         aliveContainer->Add(Checkbox(move(aliveOption)) | hcenter);
-        deadContainer->Add(Checkbox(move(deadOption))| hcenter);
+        deadContainer->Add(Checkbox(move(deadOption)) | hcenter);
     }
 
     auto controlButtonContainer = _createControlButtonContainer();
@@ -245,7 +245,7 @@ void GameOfLife::run() {
     screen.Loop(Container::Horizontal(
         {
             controlRenderer | size(WIDTH, EQUAL, controlPanelWidth),
-            cellEventHandler | flex_grow ,
+            cellEventHandler | flex_grow,
             dataRenderer | size(WIDTH, EQUAL, dataPanelWidth)
         },
         &_panelIndex
