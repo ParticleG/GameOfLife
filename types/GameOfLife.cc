@@ -29,14 +29,6 @@ namespace {
 
 GameOfLife::GameOfLife(const int height, const int width)
     : _fieldManager(height, width), _fieldSize(width, height) {
-    _aliveConfig[3] = true;
-    _deadConfig[0] = true;
-    _deadConfig[1] = true;
-    _deadConfig[4] = true;
-    _deadConfig[5] = true;
-    _deadConfig[6] = true;
-    _deadConfig[7] = true;
-    _deadConfig[8] = true;
     console::setConsoleSize(height + 2, width + inputWidth * 2 + 6);
 }
 
@@ -58,51 +50,7 @@ void GameOfLife::run() {
         deadContainer->Add(Checkbox(format("{} cells", index), &_deadConfig[index]));
     }
 
-    auto previousIterationButton = component::makeButton(
-        "<-",
-        [this] {
-            _fieldManager.isPlaying.store(false);
-            _fieldManager.previousIteration();
-        },
-        colorLightBlue
-    );
-
-    auto togglePlayPauseButton = component::makeButton(
-        [this] { return _fieldManager.isPlaying.load() ? "Pause" : "Start"; },
-        [this] {
-            _fieldManager.isPlaying.store(!_fieldManager.isPlaying.load());
-        },
-        colorGreen
-    );
-
-    auto nextIterationButton = component::makeButton(
-        "->",
-        [this] {
-            _fieldManager.isPlaying.store(false);
-            _fieldManager.nextIteration();
-        },
-        colorLightBlue
-    );
-
-    auto randomizeButton = component::makeButton(
-        "Randomize",
-        [this] {
-            _fieldManager.isPlaying.store(false);
-            _fieldManager.randomize();
-        },
-        colorOrangeLight,
-        colorOrange
-    );
-
-    auto resetButton = component::makeButton(
-        "Reset",
-        [this] {
-            _fieldManager.isPlaying.store(false);
-            _fieldManager.reset();
-        },
-        colorRedLight,
-        colorNegative
-    );
+    auto controlButtonContainer = _createControlButtonContainer();
 
     const auto controlRenderer = Renderer(
         Container::Vertical({
@@ -110,10 +58,7 @@ void GameOfLife::run() {
             heightInput,
             Container::Horizontal({aliveContainer, deadContainer}),
             playbackIntervalInput,
-            Container::Horizontal({
-                previousIterationButton, togglePlayPauseButton, nextIterationButton
-            }),
-            Container::Horizontal({randomizeButton, resetButton})
+            controlButtonContainer
         }),
         [&] {
             const auto aliveCount = _fieldManager.getCellCount();
@@ -140,12 +85,7 @@ void GameOfLife::run() {
                         text("Interval(ms): ") | align_right | flex,
                         playbackIntervalInput->Render() | controlValueSize,
                     }),
-                    hbox({
-                        previousIterationButton->Render(),
-                        togglePlayPauseButton->Render() | flex,
-                        nextIterationButton->Render(),
-                    }),
-                    hbox({randomizeButton->Render() | flex, resetButton->Render()}),
+                    controlButtonContainer->Render() | flex,
                     separator(),
                     hbox({
                         text("Iteration: ") | align_right | flex,
@@ -302,7 +242,7 @@ Component GameOfLife::_createCellRenderer() {
             );
         }
 
-        // // The IDE doesn't like this, but it compiles and works.
+        // // The IDE doesn't like this, but this should compile and run without any issue.
         // // Related issue: [CPP-36762](https://youtrack.jetbrains.com/issue/CPP-36762)
         // ranges::for_each(
         //     ranges::views::cartesian_product(
@@ -314,9 +254,9 @@ Component GameOfLife::_createCellRenderer() {
         //         drawCell(
         //             c,
         //             {x, y},
-        //             x == _mouse.x && y == _mouse.y
+        //             x == mouse.x && y == mouse.y
         //                 ? Color{Color::Grey50}
-        //                 : _field[x][y]
+        //                 : field[x][y]
         //                       ? Color{Color::White}
         //                       : Color{Color::Grey11}
         //         );
@@ -336,6 +276,60 @@ Component GameOfLife::_createCellRenderer() {
             _handleMouseEvent(event.mouse());
         }
         return false;
+    });
+}
+
+
+Component GameOfLife::_createControlButtonContainer() {
+    auto previousButton = component::makeButton(
+        "<-",
+        [this] {
+            _fieldManager.isPlaying.store(false);
+            _fieldManager.previousIteration();
+        },
+        colorLightBlue
+    );
+
+    auto playPauseButton = component::makeButton(
+        [this] { return _fieldManager.isPlaying.load() ? "Pause" : "Start"; },
+        [this] {
+            _fieldManager.isPlaying.store(!_fieldManager.isPlaying.load());
+        },
+        colorGreen
+    );
+
+    auto nextButton = component::makeButton(
+        "->",
+        [this] {
+            _fieldManager.isPlaying.store(false);
+            _fieldManager.nextIteration();
+        },
+        colorLightBlue
+    );
+
+    auto randomizeButton = component::makeButton(
+        "Randomize",
+        [this] {
+            _fieldManager.isPlaying.store(false);
+            _fieldManager.randomize();
+        },
+        colorOrangeLight,
+        colorOrange
+    );
+
+    auto resetButton = component::makeButton(
+        "Reset",
+        [this] {
+            _fieldManager.isPlaying.store(false);
+            _fieldManager.reset();
+        },
+        colorRedLight,
+        colorNegative
+    );
+
+    return Container::Vertical({
+        Container::Horizontal({move(previousButton), move(playPauseButton), move(nextButton)}),
+        Container::Horizontal({move(randomizeButton), move(resetButton)})
     });
 }
 

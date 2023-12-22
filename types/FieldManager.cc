@@ -10,6 +10,27 @@
 using namespace std;
 using namespace types;
 
+namespace {
+    uint8_t countNeighbors(const Field& field, const int x, const int y) {
+        int neighbours{};
+        for (int64_t dx = -1; dx <= 1; ++dx) {
+            for (int64_t dy = -1; dy <= 1; ++dy) {
+                const auto xCoord = x + dx;
+                const auto yCoord = y + dy;
+
+                if (!(dx == 0 && dy == 0) &&
+                    xCoord >= 0 && yCoord >= 0 &&
+                    xCoord < static_cast<int64_t>(field.size()) &&
+                    yCoord < static_cast<int64_t>(field[xCoord].size()) &&
+                    field[xCoord][yCoord]) {
+                    ++neighbours;
+                }
+            }
+        }
+        return neighbours;
+    }
+}
+
 FieldManager::FieldManager(const int height, const int width)
     : playbackInterval(chrono::milliseconds(250)) {
     _field.resize(width);
@@ -19,6 +40,7 @@ FieldManager::FieldManager(const int height, const int width)
             sub.resize(height);
         }
     );
+    _resetRules();
     _playbackThread();
 }
 
@@ -52,7 +74,12 @@ uint64_t FieldManager::getIteration() const {
 }
 
 void FieldManager::nextIteration() {
-    vector<vector<int>> neighbourCountField;
+    vector<vector<uint8_t>> neighbourCountField;
+    array<bool, 9> aliveRule{}, deadRule{}; {
+        shared_lock lock(_ruleMutex);
+        aliveRule = _aliveRule;
+        deadRule = _deadRule;
+    }
     Field nextField; {
         shared_lock fieldLock(_fieldMutex);
         unique_lock historyLock(_historyMutex);
@@ -68,30 +95,21 @@ void FieldManager::nextIteration() {
     );
     for (int x = 0; x < nextField.size(); ++x) {
         for (int y = 0; y < nextField[x].size(); ++y) {
-            int neighbours{};
-            for (int64_t dx = -1; dx <= 1; ++dx) {
-                for (int64_t dy = -1; dy <= 1; ++dy) {
-                    const auto xCoord = x + dx;
-                    const auto yCoord = y + dy;
-
-                    if (!(dx == 0 && dy == 0) &&
-                        xCoord >= 0 && yCoord >= 0 &&
-                        xCoord < static_cast<int64_t>(nextField.size()) &&
-                        yCoord < static_cast<int64_t>(nextField[xCoord].size()) &&
-                        _field[xCoord][yCoord]) {
-                        ++neighbours;
-                    }
-                }
-            }
-            neighbourCountField[x][y] = neighbours;
+            neighbourCountField[x][y] = countNeighbors(nextField, x, y);
         }
     }
 
     for (uint64_t x = 0; x < neighbourCountField.size(); ++x) {
         for (uint64_t y = 0; y < neighbourCountField[x].size(); ++y) {
             const auto& currentNeighbours = neighbourCountField[x][y];
-            nextField[x][y] = (nextField[x][y] && (currentNeighbours == 2 || currentNeighbours == 3)) ||
-                              (!nextField[x][y] && currentNeighbours == 3);
+            if (currentNeighbours < 0 || currentNeighbours > 8) {
+                continue;
+            }
+            if (nextField[x][y] && deadRule[currentNeighbours]) {
+                nextField[x][y] = false;
+            } else if (!nextField[x][y] && aliveRule[currentNeighbours]) {
+                nextField[x][y] = true;
+            }
         }
     } {
         unique_lock lock(_fieldMutex);
@@ -138,6 +156,14 @@ void FieldManager::reset() { {
     _history.clear();
 }
 
+void FieldManager::setAliveRule(const int cellCount, const bool value) {
+    if (cellCount < 0 || cellCount > 8) {
+        return;
+    }
+    unique_lock lock(_ruleMutex);
+    _aliveRule[cellCount] = value;
+}
+
 void FieldManager::setCell(const Point point, const bool value) {
     try {
         {
@@ -147,6 +173,14 @@ void FieldManager::setCell(const Point point, const bool value) {
         unique_lock lock(_historyMutex);
         _history.clear();
     } catch (...) {}
+}
+
+void FieldManager::setDeadRule(const int cellCount, const bool value) {
+    if (cellCount < 0 || cellCount > 8) {
+        return;
+    }
+    unique_lock lock(_ruleMutex);
+    _deadRule[cellCount] = value;
 }
 
 void FieldManager::setField(const Field& field) { {
@@ -184,4 +218,20 @@ void FieldManager::_playbackThread() {
             this_thread::sleep_for(playbackInterval.load());
         }
     }).detach();
+}
+
+void FieldManager::_resetRules() {
+    // Reset to default Conway Game of Life rules
+    unique_lock lock(_ruleMutex);
+
+    // Becomes alive if alive neighbours == 3
+    ranges::fill(_aliveRule, false);
+    _aliveRule[3] = true;
+
+    // Dies if 0 <= alive neighbours <= 1 or alive neighbours >= 4
+    ranges::fill(_deadRule, true);
+    _deadRule[2] = false;
+    _deadRule[3] = false;
+
+    // Do nothing if alive neighbours == 2
 }
