@@ -252,7 +252,7 @@ Component GameOfLife::_createCellRenderer() {
         const auto field = _fieldManager.getField();
         const auto width = static_cast<int>(field.size());
         const auto height = static_cast<int>(field[0].size());
-        const auto mouse = _mouse.load();
+        const auto mouse = _currentCellPosition.load();
         auto c = Canvas(width * 4, height * 4);
         for (const auto& [x,y]: views::cartesian_product(views::iota(0, width), views::iota(0, height))) {
             drawCell(
@@ -390,7 +390,7 @@ GameOfLife::_createFieldSizeInputs(string& heightString, string& widthString) {
                                    _fieldSize.y = height;
                                    _fieldManager.setSize(_fieldSize);
                                } else {
-                                   heightString = to_string(_fieldSize.x);
+                                   heightString = to_string(_fieldSize.y);
                                }
                                _panelIndex = 1;
                                return true;
@@ -465,5 +465,5 @@ void GameOfLife::_handleMouseEvent(const Mouse& mouseEvent) {
             }
         }
     }
-    _mouse.store(mouseInCanvas);
+    _currentCellPosition.store(mouseInCanvas);
 }
