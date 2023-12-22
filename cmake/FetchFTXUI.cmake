@@ -2,7 +2,7 @@ include(FetchContent)
 
 FetchContent_Declare(ftxui
         GIT_REPOSITORY https://github.com/ArthurSonzogni/ftxui
-        GIT_TAG v5.0.0
+        GIT_TAG a7b678542074722022ca31553c7eb47fa0dc4936
 )
 
 FetchContent_GetProperties(ftxui)
