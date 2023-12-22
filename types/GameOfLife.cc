@@ -19,7 +19,7 @@ namespace {
     constexpr auto cell = "██";
     constexpr auto controlPanelWidth = 35;
     constexpr auto dataPanelWidth = 25;
-    constexpr auto inputWidth = 12;
+    constexpr auto inputWidth = 8;
 
     const auto controlValueSize = size(WIDTH, EQUAL, inputWidth);
 
@@ -61,8 +61,8 @@ void GameOfLife::run() {
         deadOption.on_change = [&, index] {
             _fieldManager.setDeadRule(index, _deadRule[index]);
         };
-        aliveContainer->Add(Checkbox(move(aliveOption)));
-        deadContainer->Add(Checkbox(move(deadOption)));
+        aliveContainer->Add(Checkbox(move(aliveOption)) | hcenter);
+        deadContainer->Add(Checkbox(move(deadOption))| hcenter);
     }
 
     auto controlButtonContainer = _createControlButtonContainer();
@@ -80,27 +80,32 @@ void GameOfLife::run() {
             return window(
                 text("Control Panel") | hcenter | bold,
                 vbox({
-                    separator(),
                     hbox({
-                        text("Width: ") | align_right | flex,
+                        text("Field Width: ") | align_right | flex,
                         widthInput->Render() | controlValueSize,
                     }),
                     hbox({
-                        text("Height: ") | align_right | flex,
+                        text("Field Height: ") | align_right | flex,
                         heightInput->Render() | controlValueSize,
                     }),
                     separator(),
                     hbox({
-                        aliveContainer->Render() | flex,
+                        vbox({
+                            text("Alive Rule") | hcenter | bold,
+                            aliveContainer->Render() | flex | border,
+                        }) | flex,
                         separator(),
-                        deadContainer->Render() | flex,
-                    }) | border | flex,
+                        vbox({
+                            text("Dead Rule") | hcenter | bold,
+                            deadContainer->Render() | flex | border,
+                        }) | flex,
+                    }) | flex,
                     separator(),
                     hbox({
-                        text("Interval(ms): ") | align_right | flex,
+                        text("Running Interval(ms): ") | align_right | flex,
                         playbackIntervalInput->Render() | controlValueSize,
                     }),
-                    controlButtonContainer->Render() | flex,
+                    controlButtonContainer->Render(),
                     separator(),
                     hbox({
                         text("Iteration: ") | align_right | flex,
@@ -240,7 +245,7 @@ void GameOfLife::run() {
     screen.Loop(Container::Horizontal(
         {
             controlRenderer | size(WIDTH, EQUAL, controlPanelWidth),
-            cellEventHandler | flex_grow | border,
+            cellEventHandler | flex_grow ,
             dataRenderer | size(WIDTH, EQUAL, dataPanelWidth)
         },
         &_panelIndex
@@ -286,15 +291,19 @@ Component GameOfLife::_createCellRenderer() {
         //         );
         //     }
         // );
-        return canvas(move(c));
+        return window(text("Game of Life") | hcenter | bold, canvas(move(c)));
     }) | CatchEvent([this](Event event) {
         if (event == Event::ArrowRight) {
             _fieldManager.isPlaying.store(false);
             _fieldManager.nextIteration();
-        } else if (event == Event::ArrowLeft) {
+            return true;
+        }
+        if (event == Event::ArrowLeft) {
             _fieldManager.isPlaying.store(false);
             _fieldManager.previousIteration();
-        } else if (event.is_character()) {
+            return true;
+        }
+        if (event.is_character()) {
             _handleNormalKeysEvent(event.character());
         } else if (event.is_mouse()) {
             _handleMouseEvent(event.mouse());
@@ -352,8 +361,8 @@ Component GameOfLife::_createControlButtonContainer() {
     );
 
     return Container::Vertical({
-        Container::Horizontal({move(previousButton), move(playPauseButton), move(nextButton)}),
-        Container::Horizontal({move(randomizeButton), move(resetButton)})
+        Container::Horizontal({move(previousButton), move(playPauseButton) | flex, move(nextButton)}),
+        Container::Horizontal({move(randomizeButton) | flex, move(resetButton) | flex})
     });
 }
 
