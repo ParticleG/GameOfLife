@@ -1,5 +1,6 @@
 #include <ranges>
 
+#include <ftxui/component/component_options.hpp>
 #include <ftxui/component/screen_interactive.hpp>
 
 #include <helpers/ColorHelper.h>
@@ -29,6 +30,9 @@ namespace {
 
 GameOfLife::GameOfLife(const int height, const int width)
     : _fieldManager(height, width), _fieldSize(width, height) {
+    const auto [aliveRule, deadRule] = _fieldManager.getRules();
+    _aliveRule = aliveRule;
+    _deadRule = deadRule;
     console::setConsoleSize(height + 2, width + inputWidth * 2 + 6);
 }
 
@@ -46,8 +50,19 @@ void GameOfLife::run() {
     auto aliveContainer = Container::Vertical({});
     auto deadContainer = Container::Vertical({});
     for (int index = 0; index <= 8; ++index) {
-        aliveContainer->Add(Checkbox(format("{} cells", index), &_aliveConfig[index]));
-        deadContainer->Add(Checkbox(format("{} cells", index), &_deadConfig[index]));
+        CheckboxOption aliveOption, deadOption;
+        aliveOption.label = format("{} cells", index);
+        aliveOption.checked = &_aliveRule[index];
+        aliveOption.on_change = [&, index] {
+            _fieldManager.setAliveRule(index, _aliveRule[index]);
+        };
+        deadOption.label = format("{} cells", index);
+        deadOption.checked = &_deadRule[index];
+        deadOption.on_change = [&, index] {
+            _fieldManager.setDeadRule(index, _deadRule[index]);
+        };
+        aliveContainer->Add(Checkbox(move(aliveOption)));
+        deadContainer->Add(Checkbox(move(deadOption)));
     }
 
     auto controlButtonContainer = _createControlButtonContainer();

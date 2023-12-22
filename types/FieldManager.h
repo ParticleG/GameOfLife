@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <shared_mutex>
 #include <vector>
 
@@ -20,6 +21,8 @@ namespace types {
         [[nodiscard]] Field getField() const;
 
         [[nodiscard]] uint64_t getIteration() const;
+
+        [[nodiscard]] std::tuple<NeightborRule, NeightborRule> getRules();
 
         void nextIteration();
 
@@ -44,7 +47,7 @@ namespace types {
     private:
         mutable std::shared_mutex _ruleMutex, _fieldMutex, _historyMutex;
         Field _field;
-        std::array<bool, 9> _aliveRule{}, _deadRule{};
+        NeightborRule _aliveRule{}, _deadRule{};
         std::vector<Field> _history;
 
         void _playbackThread();

@@ -1,7 +1,5 @@
 #pragma once
 
-#include <array>
-
 #include <ftxui/component/component.hpp>
 
 #include <types/FieldManager.h>
@@ -17,11 +15,12 @@ namespace types {
         void run();
 
     private:
-        int _panelIndex{2};
         mutable std::shared_mutex _saveListMutex;
+        int _panelIndex{2};
         std::atomic<Point> _mouse;
         std::vector<FieldSave> _saveList{50};
         FieldManager _fieldManager;
+        NeightborRule _aliveRule{}, _deadRule{};
         Point _fieldSize;
 
         ftxui::Component _createCellRenderer();

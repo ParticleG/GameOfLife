@@ -1,8 +1,8 @@
 include(FetchContent)
 
 FetchContent_Declare(ftxui
-        GIT_REPOSITORY https://github.com/ArthurSonzogni/ftxui
-        GIT_TAG a7b678542074722022ca31553c7eb47fa0dc4936
+        GIT_REPOSITORY https://github.com/ParticleG/FTXUI
+        GIT_TAG main
 )
 
 FetchContent_GetProperties(ftxui)

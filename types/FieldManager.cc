@@ -73,6 +73,11 @@ uint64_t FieldManager::getIteration() const {
     return _history.size();
 }
 
+tuple<NeightborRule, NeightborRule> FieldManager::getRules() {
+    shared_lock lock(_ruleMutex);
+    return {_aliveRule, _deadRule};
+}
+
 void FieldManager::nextIteration() {
     vector<vector<uint8_t>> neighbourCountField;
     array<bool, 9> aliveRule{}, deadRule{}; {
