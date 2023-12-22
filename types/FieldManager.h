@@ -1,8 +1,6 @@
 #pragma once
 
-#include <array>
 #include <shared_mutex>
-#include <vector>
 
 #include <types/common.h>
 
@@ -39,6 +37,8 @@ namespace types {
         void setDeadRule(int cellCount, bool value);
 
         void setField(const Field& field);
+
+        void setRules(const NeightborRule& aliveRule, const NeightborRule& deadRule);
 
         void setSize(Point size);
 

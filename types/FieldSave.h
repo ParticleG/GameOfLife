@@ -9,8 +9,6 @@ namespace types {
     public:
         FieldSave() = default;
 
-        FieldSave(std::string name, Field field);
-
         ~FieldSave() = default;
 
         void changeName(const std::string& name);
@@ -19,15 +17,18 @@ namespace types {
 
         [[nodiscard]] std::tuple<std::string, std::string> getSaveTime() const;
 
-        [[nodiscard]] Field load() const;
+        [[nodiscard]] bool isValid() const;
+
+        [[nodiscard]] std::tuple<Field, NeightborRule, NeightborRule> load() const;
 
         void reset();
 
-        void save(const Field& field);
+        void save(const Field& field, NeightborRule aliveRule, NeightborRule deadRule);
 
     private:
         std::chrono::system_clock::time_point _saveTime;
         std::string _name;
         Field _field;
+        NeightborRule _aliveRule{}, _deadRule{};
     };
 }

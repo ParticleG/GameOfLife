@@ -196,6 +196,12 @@ void FieldManager::setField(const Field& field) { {
     _history.clear();
 }
 
+void FieldManager::setRules(const NeightborRule& aliveRule, const NeightborRule& deadRule) {
+    unique_lock lock(_ruleMutex);
+    _aliveRule = aliveRule;
+    _deadRule = deadRule;
+}
+
 void FieldManager::setSize(const Point size) { {
         unique_lock lock(_fieldMutex);
         _field.resize(size.x);

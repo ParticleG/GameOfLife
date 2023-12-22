@@ -3,9 +3,6 @@
 using namespace std;
 using namespace types;
 
-FieldSave::FieldSave(string name, Field field)
-    : _saveTime(chrono::system_clock::now()), _name(move(name)), _field(move(field)) {}
-
 void FieldSave::changeName(const string& name) {
     _name = name;
 }
@@ -24,8 +21,12 @@ tuple<string, string> FieldSave::getSaveTime() const {
     };
 }
 
-Field FieldSave::load() const {
-    return _field;
+bool FieldSave::isValid() const {
+    return !_field.empty();
+}
+
+tuple<Field, NeightborRule, NeightborRule> FieldSave::load() const {
+    return {_field, _aliveRule, _deadRule};
 }
 
 void FieldSave::reset() {
@@ -33,7 +34,9 @@ void FieldSave::reset() {
     _name.clear();
 }
 
-void FieldSave::save(const Field& field) {
-    _field = field;
+void FieldSave::save(const Field& field, const NeightborRule aliveRule, const NeightborRule deadRule) {
     _saveTime = chrono::system_clock::now();
+    _field = field;
+    _aliveRule = aliveRule;
+    _deadRule = deadRule;
 }

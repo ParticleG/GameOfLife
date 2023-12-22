@@ -128,13 +128,22 @@ void GameOfLife::run() {
         auto loadButton = component::makeButton(
             "Load",
             [&, index] {
-                if (const auto savedField = _saveList[index].load();
-                    !savedField.empty()) {
-                    _fieldSize.x = static_cast<int>(savedField.size());
-                    _fieldSize.y = static_cast<int>(savedField[0].size());
+                if (_saveList[index].isValid()) {
+                    _fieldManager.isPlaying.store(false);
+
+                    const auto [savedField, savedAliveRule, savedDeadRule] = _saveList[index].load();
+                    _fieldSize = {
+                        static_cast<int>(savedField.size()),
+                        static_cast<int>(savedField[0].size())
+                    };
                     heightString = to_string(_fieldSize.x);
                     widthString = to_string(_fieldSize.y);
                     _fieldManager.setField(savedField);
+                    for (int i = 0; i < 9; ++i) {
+                        _aliveRule[i] = savedAliveRule[i];
+                        _deadRule[i] = savedDeadRule[i];
+                    }
+                    _fieldManager.setRules(_aliveRule, _deadRule);
                 }
             },
             colorLightGreen
@@ -142,7 +151,7 @@ void GameOfLife::run() {
         auto saveButton = component::makeButton(
             "Save",
             [&, index] {
-                _saveList[index].save(_fieldManager.getField());
+                _saveList[index].save(_fieldManager.getField(), _aliveRule, _deadRule);
             },
             colorLightBlue
         );
@@ -155,7 +164,7 @@ void GameOfLife::run() {
             colorNegative
         );
         const auto saveItem = Renderer([&, index] {
-                const auto isValid = !_saveList[index].load().empty();
+                const auto isValid = _saveList[index].isValid();
                 const auto [saveDate, saveTime] = _saveList[index].getSaveTime();
                 Element element;
                 if (isValid) {
